@@ -20,7 +20,7 @@ import { redirect } from "next/navigation";
 const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
   typeof getCurrentUser
 >;
-const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
+// Note: mockRedirect is used in the component but not directly tested here
 
 // Import after mocks
 import ParticipantLayout from "./layout";

@@ -50,10 +50,10 @@ development_status:
   epic-1-retrospective: optional
 
   # Epic 2: Raffle Creation & QR Codes
-  epic-2: backlog
-  2-1-admin-role-authorization: backlog
-  2-2-create-new-raffle: backlog
-  2-3-generate-qr-code-with-expiration: backlog
+  epic-2: done
+  2-1-admin-role-authorization: done
+  2-2-create-new-raffle: done
+  2-3-generate-qr-code-with-expiration: done
   epic-2-retrospective: optional
 
   # Epic 3: Participant Joining & Ticket System
