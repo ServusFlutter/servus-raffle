@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Servus Raffle - Final Design Direction</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            /* Flutter Munich Colors */
+            --primary: #027DFD;
+            --primary-dark: #1E3A5F;
+            --sky-blue: #54C5F8;
+            --celebration: #F7DC6F;
+            --coral: #E8A598;
+            --success: #22C55E;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.5;
+            background: #F5FAFB;
+        }
+
+        /* Navigation */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-bottom: 1px solid #E5E7EB;
+            padding: 12px 24px;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav h1 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+
+        .nav-controls {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .view-tabs {
+            display: flex;
+            gap: 4px;
+            background: #F3F4F6;
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .view-tab {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            background: transparent;
+            color: #6B7280;
+            transition: all 0.2s;
+        }
+
+        .view-tab.active {
+            background: white;
+            color: var(--primary-dark);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .theme-toggle {
+            display: flex;
+            gap: 4px;
+            background: #F3F4F6;
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .theme-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            background: transparent;
+            color: #6B7280;
+        }
+
+        .theme-btn.active {
+            background: white;
+            color: var(--primary-dark);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* Main Content */
+        .main {
+            padding-top: 70px;
+            min-height: 100vh;
+        }
+
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        /* Phone Frame */
+        .phone-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+
+        .phone-wrapper {
+            text-align: center;
+        }
+
+        .phone-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 16px;
+        }
+
+        .phone-frame {
+            width: 320px;
+            height: 640px;
+            background: #1a1a1a;
+            border-radius: 40px;
+            padding: 12px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            border-radius: 32px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ==================== */
+        /* PARTICIPANT VIEW - LIGHT MODE */
+        /* ==================== */
+        .participant-light {
+            background: linear-gradient(135deg, #B8DDE9 0%, #54C5F8 50%, #027DFD 100%);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            color: white;
+        }
+
+        .participant-light .header {
+            padding: 48px 24px 24px;
+            text-align: center;
+        }
+
+        .participant-light .header-title {
+            font-size: 14px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .participant-light .ticket-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .participant-light .ticket-circle {
+            width: 200px;
+            height: 200px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 4px solid rgba(255,255,255,0.4);
+            backdrop-filter: blur(10px);
+        }
+
+        .participant-light .ticket-number {
+            font-size: 96px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .participant-light .ticket-label {
+            font-size: 16px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 4px;
+        }
+
+        .participant-light .message {
+            margin-top: 24px;
+            font-size: 20px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .participant-light .status-bar {
+            padding: 16px 24px;
+            background: rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .participant-light .status-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .participant-light .status-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .participant-light .status-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* ==================== */
+        /* PARTICIPANT VIEW - DARK MODE */
+        /* ==================== */
+        .participant-dark {
+            background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            color: #F8FAFC;
+        }
+
+        .participant-dark .header {
+            padding: 48px 24px 24px;
+            text-align: center;
+        }
+
+        .participant-dark .header-title {
+            font-size: 14px;
+            opacity: 0.7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .participant-dark .ticket-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .participant-dark .ticket-circle {
+            width: 200px;
+            height: 200px;
+            background: rgba(84, 197, 248, 0.1);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid rgba(84, 197, 248, 0.3);
+            box-shadow: 0 0 60px rgba(84, 197, 248, 0.3);
+        }
+
+        .participant-dark .ticket-number {
+            font-size: 96px;
+            font-weight: 700;
+            line-height: 1;
+            color: var(--sky-blue);
+            text-shadow: 0 0 40px rgba(84, 197, 248, 0.5);
+        }
+
+        .participant-dark .ticket-label {
+            font-size: 14px;
+            color: #94A3B8;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 8px;
+        }
+
+        .participant-dark .message {
+            margin-top: 24px;
+            font-size: 18px;
+            font-weight: 500;
+            color: #94A3B8;
+        }
+
+        .participant-dark .status-bar {
+            padding: 16px 24px;
+            background: rgba(0,0,0,0.3);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .participant-dark .status-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .participant-dark .status-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .participant-dark .status-text {
+            font-size: 14px;
+            font-weight: 500;
+            color: #94A3B8;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
+
+        /* ==================== */
+        /* WHEEL VIEW */
+        /* ==================== */
+        .wheel-view {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 20px;
+        }
+
+        .projection-frame {
+            width: 800px;
+            height: 500px;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .projection-screen {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .wheel-wrapper {
+            position: relative;
+        }
+
+        .wheel {
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            background: conic-gradient(
+                #1E3A5F 0deg 60deg,
+                #027DFD 60deg 120deg,
+                #54C5F8 120deg 180deg,
+                #1E3A5F 180deg 240deg,
+                #027DFD 240deg 300deg,
+                #54C5F8 300deg 360deg
+            );
+            box-shadow: 0 0 60px rgba(84, 197, 248, 0.4);
+            transition: transform 5s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+        }
+
+        .wheel.spinning {
+            transform: rotate(1800deg);
+        }
+
+        .wheel-pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 16px solid transparent;
+            border-right: 16px solid transparent;
+            border-top: 28px solid var(--celebration);
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+            z-index: 10;
+        }
+
+        .wheel-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background: #0F172A;
+            border-radius: 50%;
+            border: 4px solid var(--sky-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .wheel-center:hover {
+            background: var(--sky-blue);
+            color: #0F172A;
+        }
+
+        .wheel-title {
+            position: absolute;
+            top: 40px;
+            font-size: 24px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .wheel-subtitle {
+            position: absolute;
+            bottom: 40px;
+            font-size: 16px;
+            color: #94A3B8;
+        }
+
+        .participants-badge {
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            background: rgba(255,255,255,0.1);
+            padding: 8px 16px;
+            border-radius: 20px;
+            color: white;
+            font-size: 14px;
+        }
+
+        /* ==================== */
+        /* CELEBRATION VIEW */
+        /* ==================== */
+        .celebration-view {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 20px;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+
+        .celebration-frame {
+            width: 800px;
+            height: 500px;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .celebration-screen {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: radial-gradient(circle at center, rgba(247, 220, 111, 0.15) 0%, transparent 60%);
+        }
+
+        .winner-card {
+            background: var(--celebration);
+            color: #1E3A5F;
+            padding: 48px 72px;
+            border-radius: 24px;
+            text-align: center;
+            box-shadow: 0 0 100px rgba(247, 220, 111, 0.4);
+            position: relative;
+            z-index: 10;
+        }
+
+        .winner-label {
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            opacity: 0.8;
+        }
+
+        .winner-name {
+            font-size: 56px;
+            font-weight: 700;
+            margin: 12px 0;
+        }
+
+        .winner-tickets {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .trigger-confetti {
+            position: absolute;
+            bottom: 40px;
+            padding: 12px 24px;
+            background: var(--celebration);
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1E3A5F;
+            cursor: pointer;
+            z-index: 20;
+        }
+
+        .trigger-confetti:hover {
+            background: #f5d85a;
+        }
+
+        /* Mobile participant in celebration */
+        .celebration-mobile {
+            width: 320px;
+            height: 640px;
+            background: #1a1a1a;
+            border-radius: 40px;
+            padding: 12px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+
+        .celebration-mobile-screen {
+            width: 100%;
+            height: 100%;
+            border-radius: 32px;
+            overflow: hidden;
+            background: #0F172A;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mobile-celebration-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: radial-gradient(circle at center, rgba(247, 220, 111, 0.1) 0%, transparent 60%);
+        }
+
+        .mobile-winner-card {
+            background: var(--celebration);
+            color: #1E3A5F;
+            padding: 24px 32px;
+            border-radius: 16px;
+            text-align: center;
+        }
+
+        .mobile-winner-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.8;
+        }
+
+        .mobile-winner-name {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 8px 0;
+        }
+
+        .mobile-winner-tickets {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .mobile-message {
+            margin-top: 24px;
+            color: #94A3B8;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        /* Non-winner mobile view */
+        .non-winner-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .non-winner-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(84, 197, 248, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+
+        .non-winner-icon svg {
+            width: 40px;
+            height: 40px;
+            color: var(--sky-blue);
+        }
+
+        .non-winner-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #F8FAFC;
+            margin-bottom: 8px;
+        }
+
+        .non-winner-message {
+            font-size: 16px;
+            color: #94A3B8;
+            margin-bottom: 24px;
+        }
+
+        .ticket-carry {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(34, 197, 94, 0.1);
+            padding: 12px 20px;
+            border-radius: 24px;
+            color: var(--success);
+            font-weight: 500;
+        }
+
+        /* All States View */
+        .states-view {
+            padding: 40px 20px;
+        }
+
+        .states-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 8px;
+        }
+
+        .states-subtitle {
+            text-align: center;
+            color: #6B7280;
+            margin-bottom: 40px;
+        }
+
+        .states-grid {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .state-card {
+            text-align: center;
+        }
+
+        .state-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 12px;
+        }
+
+        .mini-phone {
+            width: 200px;
+            height: 400px;
+            background: #1a1a1a;
+            border-radius: 24px;
+            padding: 8px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
+        }
+
+        .mini-screen {
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        /* Mini versions */
+        .mini-participant-dark {
+            background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            color: #F8FAFC;
+        }
+
+        .mini-participant-dark .mini-header {
+            padding: 24px 12px 12px;
+            text-align: center;
+            font-size: 10px;
+            opacity: 0.7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .mini-participant-dark .mini-ticket-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+        }
+
+        .mini-participant-dark .mini-ticket-circle {
+            width: 100px;
+            height: 100px;
+            background: rgba(84, 197, 248, 0.1);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(84, 197, 248, 0.3);
+            box-shadow: 0 0 30px rgba(84, 197, 248, 0.3);
+        }
+
+        .mini-participant-dark .mini-ticket-number {
+            font-size: 48px;
+            font-weight: 700;
+            line-height: 1;
+            color: var(--sky-blue);
+        }
+
+        .mini-participant-dark .mini-ticket-label {
+            font-size: 8px;
+            color: #94A3B8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+
+        .mini-participant-dark .mini-message {
+            margin-top: 12px;
+            font-size: 11px;
+            color: #94A3B8;
+        }
+
+        .mini-participant-dark .mini-status-bar {
+            padding: 10px 12px;
+            background: rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .mini-participant-dark .mini-status-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--success);
+            border-radius: 50%;
+        }
+
+        .mini-participant-dark .mini-status-text {
+            font-size: 9px;
+            color: #94A3B8;
+        }
+
+        /* Spinning state */
+        .mini-spinning {
+            background: #0F172A;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mini-wheel {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: conic-gradient(
+                #1E3A5F 0deg 60deg,
+                #027DFD 60deg 120deg,
+                #54C5F8 120deg 180deg,
+                #1E3A5F 180deg 240deg,
+                #027DFD 240deg 300deg,
+                #54C5F8 300deg 360deg
+            );
+            box-shadow: 0 0 30px rgba(84, 197, 248, 0.4);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .mini-spinning-text {
+            margin-top: 16px;
+            font-size: 12px;
+            color: #94A3B8;
+        }
+
+        /* Mini winner */
+        .mini-winner {
+            background: #0F172A;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, rgba(247, 220, 111, 0.1) 0%, transparent 60%), #0F172A;
+        }
+
+        .mini-winner-card {
+            background: var(--celebration);
+            color: #1E3A5F;
+            padding: 16px 24px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .mini-winner-label {
+            font-size: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.8;
+        }
+
+        .mini-winner-name {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 4px 0;
+        }
+
+        .mini-winner-tickets {
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Mini non-winner */
+        .mini-non-winner {
+            background: #0F172A;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .mini-non-winner-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #F8FAFC;
+            margin-bottom: 8px;
+        }
+
+        .mini-non-winner-message {
+            font-size: 10px;
+            color: #94A3B8;
+            margin-bottom: 12px;
+        }
+
+        .mini-ticket-carry {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(34, 197, 94, 0.1);
+            padding: 8px 12px;
+            border-radius: 16px;
+            color: var(--success);
+            font-size: 10px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <h1>Servus Raffle - Final Design Direction</h1>
+        <div class="nav-controls">
+            <div class="view-tabs">
+                <button class="view-tab active" data-view="participant">Participant</button>
+                <button class="view-tab" data-view="wheel">Wheel</button>
+                <button class="view-tab" data-view="celebration">Celebration</button>
+                <button class="view-tab" data-view="states">All States</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main">
+        <!-- Participant View -->
+        <div id="participant" class="view active">
+            <div class="phone-container">
+                <!-- Light Mode -->
+                <div class="phone-wrapper">
+                    <div class="phone-label">Light Mode (User Preference)</div>
+                    <div class="phone-frame">
+                        <div class="phone-screen">
+                            <div class="participant-light">
+                                <div class="header">
+                                    <div class="header-title">Flutter Munich Raffle</div>
+                                </div>
+                                <div class="ticket-area">
+                                    <div class="ticket-circle">
+                                        <div class="ticket-number">5</div>
+                                        <div class="ticket-label">Tickets</div>
+                                    </div>
+                                    <div class="message">Your best odds yet!</div>
+                                </div>
+                                <div class="status-bar">
+                                    <div class="status-content">
+                                        <div class="status-dot"></div>
+                                        <div class="status-text">Locked in - waiting for draw</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dark Mode -->
+                <div class="phone-wrapper">
+                    <div class="phone-label">Dark Mode (User Preference)</div>
+                    <div class="phone-frame">
+                        <div class="phone-screen">
+                            <div class="participant-dark">
+                                <div class="header">
+                                    <div class="header-title">Flutter Munich Raffle</div>
+                                </div>
+                                <div class="ticket-area">
+                                    <div class="ticket-circle">
+                                        <div class="ticket-number">5</div>
+                                        <div class="ticket-label">Tickets</div>
+                                    </div>
+                                    <div class="message">Your best odds yet!</div>
+                                </div>
+                                <div class="status-bar">
+                                    <div class="status-content">
+                                        <div class="status-dot"></div>
+                                        <div class="status-text">Locked in - waiting for draw</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wheel View -->
+        <div id="wheel" class="view">
+            <div class="wheel-view">
+                <div class="projection-frame">
+                    <div class="projection-screen">
+                        <div class="wheel-title">December Meetup Raffle</div>
+                        <div class="participants-badge">47 participants</div>
+                        <div class="wheel-wrapper">
+                            <div class="wheel-pointer"></div>
+                            <div class="wheel" id="spinWheel"></div>
+                            <div class="wheel-center" onclick="spinWheel()">SPIN</div>
+                        </div>
+                        <div class="wheel-subtitle">Click wheel to demo spin animation</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Celebration View -->
+        <div id="celebration" class="view">
+            <div class="celebration-view">
+                <!-- Projection -->
+                <div>
+                    <div class="phone-label" style="margin-bottom: 16px;">Projection View (Always Dark)</div>
+                    <div class="celebration-frame" id="confettiContainer">
+                        <div class="celebration-screen">
+                            <div class="winner-card">
+                                <div class="winner-label">Winner!</div>
+                                <div class="winner-name">Lisa M.</div>
+                                <div class="winner-tickets">8 tickets</div>
+                            </div>
+                            <button class="trigger-confetti" onclick="fireConfetti()">Trigger Confetti</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mobile Views -->
+                <div>
+                    <div class="phone-label" style="margin-bottom: 16px;">Winner's Phone</div>
+                    <div class="celebration-mobile">
+                        <div class="celebration-mobile-screen">
+                            <div class="mobile-celebration-content">
+                                <div class="mobile-winner-card">
+                                    <div class="mobile-winner-label">You Won!</div>
+                                    <div class="mobile-winner-name">Lisa M.</div>
+                                    <div class="mobile-winner-tickets">8 tickets</div>
+                                </div>
+                                <div class="mobile-message">Congratulations! Your tickets have been reset.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="phone-label" style="margin-bottom: 16px;">Non-Winner's Phone</div>
+                    <div class="celebration-mobile">
+                        <div class="celebration-mobile-screen">
+                            <div class="non-winner-content">
+                                <div class="non-winner-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div class="non-winner-title">Not this time!</div>
+                                <div class="non-winner-message">Your tickets carry forward to the next raffle</div>
+                                <div class="ticket-carry">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    5 tickets saved
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- All States View -->
+        <div id="states" class="view">
+            <div class="states-view">
+                <h2 class="states-title">Participant Journey States</h2>
+                <p class="states-subtitle">All states a participant sees throughout the raffle experience (Dark Mode)</p>
+
+                <div class="states-grid">
+                    <!-- Waiting State -->
+                    <div class="state-card">
+                        <div class="state-label">1. Waiting for Draw</div>
+                        <div class="mini-phone">
+                            <div class="mini-screen">
+                                <div class="mini-participant-dark">
+                                    <div class="mini-header">Flutter Munich Raffle</div>
+                                    <div class="mini-ticket-area">
+                                        <div class="mini-ticket-circle">
+                                            <div class="mini-ticket-number">5</div>
+                                            <div class="mini-ticket-label">Tickets</div>
+                                        </div>
+                                        <div class="mini-message">Your best odds yet!</div>
+                                    </div>
+                                    <div class="mini-status-bar">
+                                        <div class="mini-status-dot"></div>
+                                        <div class="mini-status-text">Locked in - waiting</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Spinning State -->
+                    <div class="state-card">
+                        <div class="state-label">2. Wheel Spinning</div>
+                        <div class="mini-phone">
+                            <div class="mini-screen">
+                                <div class="mini-spinning">
+                                    <div class="mini-wheel"></div>
+                                    <div class="mini-spinning-text">Drawing winner...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Winner State -->
+                    <div class="state-card">
+                        <div class="state-label">3a. You Won!</div>
+                        <div class="mini-phone">
+                            <div class="mini-screen">
+                                <div class="mini-winner">
+                                    <div class="mini-winner-card">
+                                        <div class="mini-winner-label">You Won!</div>
+                                        <div class="mini-winner-name">Lisa M.</div>
+                                        <div class="mini-winner-tickets">8 tickets</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Non-Winner State -->
+                    <div class="state-card">
+                        <div class="state-label">3b. Not This Time</div>
+                        <div class="mini-phone">
+                            <div class="mini-screen">
+                                <div class="mini-non-winner">
+                                    <div class="mini-non-winner-title">Not this time!</div>
+                                    <div class="mini-non-winner-message">Your tickets carry forward</div>
+                                    <div class="mini-ticket-carry">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        5 tickets saved
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // View navigation
+        document.querySelectorAll('.view-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.view).classList.add('active');
+            });
+        });
+
+        // Wheel spin
+        let isSpinning = false;
+        function spinWheel() {
+            if (isSpinning) return;
+            isSpinning = true;
+            const wheel = document.getElementById('spinWheel');
+            wheel.classList.add('spinning');
+            setTimeout(() => {
+                wheel.classList.remove('spinning');
+                wheel.style.transform = 'rotate(0deg)';
+                isSpinning = false;
+            }, 5000);
+        }
+
+        // Confetti
+        function fireConfetti() {
+            const container = document.getElementById('confettiContainer');
+            const rect = container.getBoundingClientRect();
+
+            // Custom confetti colors matching our palette
+            const colors = ['#F7DC6F', '#E8A598', '#027DFD', '#54C5F8'];
+
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: {
+                    x: (rect.left + rect.width / 2) / window.innerWidth,
+                    y: (rect.top + rect.height / 2) / window.innerHeight
+                },
+                colors: colors,
+                disableForReducedMotion: true
+            });
+
+            // Second burst
+            setTimeout(() => {
+                confetti({
+                    particleCount: 100,
+                    spread: 100,
+                    origin: {
+                        x: (rect.left + rect.width / 2) / window.innerWidth,
+                        y: (rect.top + rect.height / 2) / window.innerHeight
+                    },
+                    colors: colors,
+                    disableForReducedMotion: true
+                });
+            }, 200);
+        }
+    </script>
+</body>
+</html>

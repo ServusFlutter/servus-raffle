@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Servus Raffle - Design Directions</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Light Mode - Flutter Munich */
+            --primary: #027DFD;
+            --primary-dark: #1E3A5F;
+            --background: #F5FAFB;
+            --surface: #FFFFFF;
+            --celebration: #F7DC6F;
+            --coral: #E8A598;
+            --success: #22C55E;
+            --text: #1E3A5F;
+            --text-muted: #6B7280;
+            --sky-blue: #54C5F8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--background);
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        /* Navigation */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--surface);
+            border-bottom: 1px solid #E5E7EB;
+            padding: 16px 24px;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-tab {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-tab:hover {
+            background: var(--background);
+        }
+
+        .nav-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .theme-toggle {
+            display: flex;
+            gap: 4px;
+            background: var(--background);
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .theme-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            background: transparent;
+            color: var(--text-muted);
+        }
+
+        .theme-btn.active {
+            background: var(--surface);
+            color: var(--text);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* Main Content */
+        .main {
+            padding-top: 80px;
+        }
+
+        .section {
+            display: none;
+            padding: 32px;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--primary-dark);
+        }
+
+        .section-desc {
+            color: var(--text-muted);
+            margin-bottom: 32px;
+            max-width: 600px;
+        }
+
+        /* Design Direction Cards */
+        .directions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+        }
+
+        .direction-card {
+            background: var(--surface);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .direction-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15);
+        }
+
+        .direction-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #E5E7EB;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .direction-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .direction-tag {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: var(--background);
+            color: var(--text-muted);
+        }
+
+        .direction-preview {
+            height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .direction-footer {
+            padding: 16px 20px;
+            border-top: 1px solid #E5E7EB;
+        }
+
+        .direction-traits {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .trait {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: var(--background);
+            color: var(--text-muted);
+        }
+
+        /* Direction 1: Clean Minimal */
+        .preview-minimal {
+            background: linear-gradient(180deg, #F5FAFB 0%, #FFFFFF 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+        }
+
+        .preview-minimal .ticket-display {
+            text-align: center;
+        }
+
+        .preview-minimal .ticket-number {
+            font-size: 96px;
+            font-weight: 700;
+            color: var(--primary);
+            line-height: 1;
+        }
+
+        .preview-minimal .ticket-label {
+            font-size: 16px;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        .preview-minimal .status-pill {
+            margin-top: 24px;
+            padding: 12px 24px;
+            background: var(--success);
+            color: white;
+            border-radius: 24px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        /* Direction 2: Bold Playful */
+        .preview-playful {
+            background: linear-gradient(135deg, var(--sky-blue) 0%, var(--primary) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+            color: white;
+        }
+
+        .preview-playful .ticket-circle {
+            width: 180px;
+            height: 180px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 4px solid rgba(255,255,255,0.4);
+        }
+
+        .preview-playful .ticket-number {
+            font-size: 72px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .preview-playful .ticket-label {
+            font-size: 14px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .preview-playful .message {
+            margin-top: 24px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Direction 3: Card Stack */
+        .preview-cards {
+            background: var(--background);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .preview-cards .info-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .preview-cards .card-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .preview-cards .card-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .preview-cards .card-context {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .preview-cards .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: rgba(34, 197, 94, 0.1);
+            border-radius: 8px;
+            color: var(--success);
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .preview-cards .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+        }
+
+        /* Direction 4: Dark Immersive */
+        .preview-dark {
+            background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+            color: #F8FAFC;
+        }
+
+        .preview-dark .glow-number {
+            font-size: 120px;
+            font-weight: 700;
+            color: var(--sky-blue);
+            text-shadow: 0 0 60px rgba(84, 197, 248, 0.5);
+            line-height: 1;
+        }
+
+        .preview-dark .label {
+            font-size: 14px;
+            color: #94A3B8;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .preview-dark .accent-bar {
+            margin-top: 32px;
+            height: 4px;
+            width: 60px;
+            background: linear-gradient(90deg, var(--sky-blue), var(--celebration));
+            border-radius: 2px;
+        }
+
+        /* Direction 5: Celebration Focus */
+        .preview-celebration {
+            background: #0F172A;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .preview-celebration::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at center, rgba(247, 220, 111, 0.15) 0%, transparent 50%);
+        }
+
+        .preview-celebration .winner-card {
+            background: var(--celebration);
+            color: #1E3A5F;
+            padding: 32px 48px;
+            border-radius: 16px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .preview-celebration .winner-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.8;
+        }
+
+        .preview-celebration .winner-name {
+            font-size: 36px;
+            font-weight: 700;
+            margin: 8px 0;
+        }
+
+        .preview-celebration .winner-tickets {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Direction 6: Split Screen */
+        .preview-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            height: 100%;
+        }
+
+        .preview-split .left {
+            background: var(--primary);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .preview-split .right {
+            background: var(--surface);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .preview-split .big-number {
+            font-size: 80px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .preview-split .small-label {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 8px;
+        }
+
+        .preview-split .wheel-placeholder {
+            width: 120px;
+            height: 120px;
+            border: 4px solid var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .preview-split .wheel-label {
+            margin-top: 16px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        /* Wheel Mockups */
+        .wheel-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 24px;
+        }
+
+        .wheel-mockup {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .wheel-segment {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+
+        .wheel-classic {
+            background: conic-gradient(
+                var(--primary) 0deg 45deg,
+                var(--sky-blue) 45deg 90deg,
+                var(--primary) 90deg 135deg,
+                var(--sky-blue) 135deg 180deg,
+                var(--primary) 180deg 225deg,
+                var(--sky-blue) 225deg 270deg,
+                var(--primary) 270deg 315deg,
+                var(--sky-blue) 315deg 360deg
+            );
+            border: 4px solid var(--primary-dark);
+        }
+
+        .wheel-modern {
+            background: conic-gradient(
+                #1E3A5F 0deg 60deg,
+                #027DFD 60deg 120deg,
+                #54C5F8 120deg 180deg,
+                #1E3A5F 180deg 240deg,
+                #027DFD 240deg 300deg,
+                #54C5F8 300deg 360deg
+            );
+            border: none;
+            box-shadow: 0 8px 32px rgba(2, 125, 253, 0.3);
+        }
+
+        .wheel-celebration {
+            background: conic-gradient(
+                var(--celebration) 0deg 45deg,
+                var(--coral) 45deg 90deg,
+                var(--celebration) 90deg 135deg,
+                var(--coral) 135deg 180deg,
+                var(--celebration) 180deg 225deg,
+                var(--coral) 225deg 270deg,
+                var(--celebration) 270deg 315deg,
+                var(--coral) 315deg 360deg
+            );
+            border: 4px solid var(--primary-dark);
+        }
+
+        .wheel-pointer {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 12px solid transparent;
+            border-right: 12px solid transparent;
+            border-top: 20px solid var(--primary-dark);
+            z-index: 10;
+        }
+
+        .wheel-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            background: var(--surface);
+            border-radius: 50%;
+            border: 3px solid var(--primary-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 12px;
+            color: var(--primary-dark);
+        }
+
+        /* Comparison Section */
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .compare-card {
+            background: var(--surface);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .compare-header {
+            padding: 12px 16px;
+            background: var(--background);
+            font-weight: 600;
+            font-size: 14px;
+            border-bottom: 1px solid #E5E7EB;
+        }
+
+        .compare-preview {
+            height: 300px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .directions-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-tabs {
+                display: none;
+            }
+        }
+
+        /* Dark mode for entire page */
+        body.dark-mode {
+            --background: #0F172A;
+            --surface: #1E293B;
+            --text: #F8FAFC;
+            --text-muted: #94A3B8;
+        }
+
+        body.dark-mode .nav {
+            background: #1E293B;
+            border-color: #334155;
+        }
+
+        body.dark-mode .direction-card {
+            border: 1px solid #334155;
+        }
+
+        body.dark-mode .direction-header,
+        body.dark-mode .direction-footer {
+            border-color: #334155;
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <h1>Servus Raffle - Design Directions</h1>
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-section="participant">Participant Views</button>
+            <button class="nav-tab" data-section="wheels">Wheel Styles</button>
+            <button class="nav-tab" data-section="celebration">Celebrations</button>
+            <button class="nav-tab" data-section="compare">Compare</button>
+        </div>
+        <div class="theme-toggle">
+            <button class="theme-btn active" data-theme="light">Light</button>
+            <button class="theme-btn" data-theme="dark">Dark</button>
+        </div>
+    </nav>
+
+    <main class="main">
+        <!-- Participant Views -->
+        <section id="participant" class="section active">
+            <h2 class="section-title">Participant View Directions</h2>
+            <p class="section-desc">Different approaches to displaying ticket count and status on mobile devices. Each direction prioritizes the ticket number as the hero element.</p>
+
+            <div class="directions-grid">
+                <!-- Direction 1: Clean Minimal -->
+                <div class="direction-card">
+                    <div class="direction-header">
+                        <span class="direction-name">1. Clean Minimal</span>
+                        <span class="direction-tag">Recommended</span>
+                    </div>
+                    <div class="direction-preview preview-minimal">
+                        <div class="ticket-display">
+                            <div class="ticket-number">5</div>
+                            <div class="ticket-label">tickets</div>
+                        </div>
+                        <div class="status-pill">You're in the raffle!</div>
+                    </div>
+                    <div class="direction-footer">
+                        <div class="direction-traits">
+                            <span class="trait">Maximum clarity</span>
+                            <span class="trait">Fast scanning</span>
+                            <span class="trait">Light feel</span>
+                            <span class="trait">Accessible</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Direction 2: Bold Playful -->
+                <div class="direction-card">
+                    <div class="direction-header">
+                        <span class="direction-name">2. Bold Playful</span>
+                        <span class="direction-tag">High energy</span>
+                    </div>
+                    <div class="direction-preview preview-playful">
+                        <div class="ticket-circle">
+                            <div class="ticket-number">5</div>
+                            <div class="ticket-label">Tickets</div>
+                        </div>
+                        <div class="message">Your best odds yet!</div>
+                    </div>
+                    <div class="direction-footer">
+                        <div class="direction-traits">
+                            <span class="trait">Exciting</span>
+                            <span class="trait">Community vibe</span>
+                            <span class="trait">Branded</span>
+                            <span class="trait">Memorable</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Direction 3: Card Stack -->
+                <div class="direction-card">
+                    <div class="direction-header">
+                        <span class="direction-name">3. Info Cards</span>
+                        <span class="direction-tag">Detailed</span>
+                    </div>
+                    <div class="direction-preview preview-cards">
+                        <div class="info-card">
+                            <div class="card-label">Your Tickets</div>
+                            <div class="card-value">5</div>
+                            <div class="card-context">Accumulated over 5 events</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="card-label">Current Raffle</div>
+                            <div class="card-value" style="font-size: 20px; color: var(--text);">December Meetup</div>
+                            <div class="card-context">47 participants</div>
+                        </div>
+                        <div class="status-bar">
+                            <span class="status-dot"></span>
+                            Registered for tonight's draw
+                        </div>
+                    </div>
+                    <div class="direction-footer">
+                        <div class="direction-traits">
+                            <span class="trait">Informative</span>
+                            <span class="trait">Context-rich</span>
+                            <span class="trait">Scannable</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Direction 4: Dark Immersive -->
+                <div class="direction-card">
+                    <div class="direction-header">
+                        <span class="direction-name">4. Dark Immersive</span>
+                        <span class="direction-tag">Dramatic</span>
+                    </div>
+                    <div class="direction-preview preview-dark">
+                        <div class="glow-number">5</div>
+                        <div class="label">Tickets</div>
+                        <div class="accent-bar"></div>
+                    </div>
+                    <div class="direction-footer">
+                        <div class="direction-traits">
+                            <span class="trait">Dramatic</span>
+                            <span class="trait">Premium feel</span>
+                            <span class="trait">Focus</span>
+                            <span class="trait">Projection-ready</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Direction 5: Split Layout -->
+                <div class="direction-card">
+                    <div class="direction-header">
+                        <span class="direction-name">5. Split Focus</span>
+                        <span class="direction-tag">Balanced</span>
+                    </div>
+                    <div class="direction-preview preview-split">
+                        <div class="left">
+                            <div class="big-number">5</div>
+                            <div class="small-label">Your Tickets</div>
+                        </div>
+                        <div class="right">
+                            <div class="wheel-placeholder">SPIN</div>
+                            <div class="wheel-label">Waiting for draw...</div>
+                        </div>
+                    </div>
+                    <div class="direction-footer">
+                        <div class="direction-traits">
+                            <span class="trait">Dual focus</span>
+                            <span class="trait">Action-ready</span>
+                            <span class="trait">Clear hierarchy</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Direction 6: Celebration Ready -->
+                <div class="direction-card">
+                    <div class="direction-header">
+                        <span class="direction-name">6. Celebration Style</span>
+                        <span class="direction-tag">Winner view</span>
+                    </div>
+                    <div class="direction-preview preview-celebration">
+                        <div class="winner-card">
+                            <div class="winner-label">Winner!</div>
+                            <div class="winner-name">Lisa M.</div>
+                            <div class="winner-tickets">8 tickets</div>
+                        </div>
+                    </div>
+                    <div class="direction-footer">
+                        <div class="direction-traits">
+                            <span class="trait">Celebration</span>
+                            <span class="trait">Loyalty visible</span>
+                            <span class="trait">Gold accent</span>
+                            <span class="trait">Shareable</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Wheel Styles -->
+        <section id="wheels" class="section">
+            <h2 class="section-title">Wheel Style Directions</h2>
+            <p class="section-desc">Different visual approaches for the raffle wheel - the centerpiece of the experience. All wheels support the 5-second spin animation.</p>
+
+            <div class="directions-grid">
+                <div class="direction-card">
+                    <div class="direction-header">
+                        <span class="direction-name">Classic Segments</span>
+                        <span class="direction-tag">Traditional</span>
+                    </div>
+                    <div class="direction-preview" style="background: var(--background);">
+                        <div class="wheel-container">
+                            <div style="position: relative;">
+                                <div class="wheel-pointer"></div>
+                                <div class="wheel-mockup wheel-classic"></div>
+                                <div class="wheel-center">GO</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="direction-footer">
+                        <div class="direction-traits">
+                            <span class="trait">Familiar</span>
+                            <span class="trait">Game show feel</span>
+                            <span class="trait">Clear segments</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="direction-card">
+                    <div class="direction-header">
+                        <span class="direction-name">Modern Gradient</span>
+                        <span class="direction-tag">Recommended</span>
+                    </div>
+                    <div class="direction-preview" style="background: #0F172A;">
+                        <div class="wheel-container">
+                            <div style="position: relative;">
+                                <div class="wheel-pointer" style="border-top-color: var(--celebration);"></div>
+                                <div class="wheel-mockup wheel-modern"></div>
+                                <div class="wheel-center" style="background: #0F172A; color: white; border-color: var(--sky-blue);">GO</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="direction-footer">
+                        <div class="direction-traits">
+                            <span class="trait">Contemporary</span>
+                            <span class="trait">Brand colors</span>
+                            <span class="trait">Projection-optimized</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="direction-card">
+                    <div class="direction-header">
+                        <span class="direction-name">Celebration Colors</span>
+                        <span class="direction-tag">Festive</span>
+                    </div>
+                    <div class="direction-preview" style="background: var(--primary-dark);">
+                        <div class="wheel-container">
+                            <div style="position: relative;">
+                                <div class="wheel-pointer" style="border-top-color: white;"></div>
+                                <div class="wheel-mockup wheel-celebration"></div>
+                                <div class="wheel-center">GO</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="direction-footer">
+                        <div class="direction-traits">
+                            <span class="trait">Warm</span>
+                            <span class="trait">Celebration vibes</span>
+                            <span class="trait">Gold accent</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Celebration Views -->
+        <section id="celebration" class="section">
+            <h2 class="section-title">Winner Celebration Directions</h2>
+            <p class="section-desc">The moment of truth - how we display winners and validate their loyalty through ticket count visibility.</p>
+
+            <div class="directions-grid">
+                <div class="direction-card">
+                    <div class="direction-header">
+                        <span class="direction-name">Gold Spotlight</span>
+                        <span class="direction-tag">Recommended</span>
+                    </div>
+                    <div class="direction-preview preview-celebration">
+                        <div class="winner-card">
+                            <div class="winner-label">Winner!</div>
+                            <div class="winner-name">Lisa M.</div>
+                            <div class="winner-tickets">8 tickets</div>
+                        </div>
+                    </div>
+                    <div class="direction-footer">
+                        <div class="direction-traits">
+                            <span class="trait">High impact</span>
+                            <span class="trait">Ticket validation</span>
+                            <span class="trait">Projection-ready</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="direction-card">
+                    <div class="direction-header">
+                        <span class="direction-name">Confetti Burst</span>
+                        <span class="direction-tag">Festive</span>
+                    </div>
+                    <div class="direction-preview" style="background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%); display: flex; align-items: center; justify-content: center;">
+                        <div style="text-align: center; color: white;">
+                            <div style="font-size: 14px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.8;">Congratulations</div>
+                            <div style="font-size: 48px; font-weight: 700; margin: 16px 0;">Lisa M.</div>
+                            <div style="display: inline-block; background: var(--celebration); color: var(--primary-dark); padding: 8px 24px; border-radius: 24px; font-weight: 600;">8 tickets - WINNER!</div>
+                        </div>
+                    </div>
+                    <div class="direction-footer">
+                        <div class="direction-traits">
+                            <span class="trait">Animated</span>
+                            <span class="trait">Community feel</span>
+                            <span class="trait">Brand colors</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="direction-card">
+                    <div class="direction-header">
+                        <span class="direction-name">Minimal Reveal</span>
+                        <span class="direction-tag">Clean</span>
+                    </div>
+                    <div class="direction-preview" style="background: white; display: flex; align-items: center; justify-content: center;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 64px; font-weight: 700; color: var(--primary);">Lisa M.</div>
+                            <div style="font-size: 24px; color: var(--text-muted); margin-top: 8px;">Winner with 8 tickets</div>
+                            <div style="width: 60px; height: 4px; background: var(--celebration); margin: 24px auto; border-radius: 2px;"></div>
+                        </div>
+                    </div>
+                    <div class="direction-footer">
+                        <div class="direction-traits">
+                            <span class="trait">Understated</span>
+                            <span class="trait">Elegant</span>
+                            <span class="trait">Readable</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Comparison -->
+        <section id="compare" class="section">
+            <h2 class="section-title">Side-by-Side Comparison</h2>
+            <p class="section-desc">Compare recommended directions across different contexts.</p>
+
+            <div class="comparison-grid">
+                <div class="compare-card">
+                    <div class="compare-header">Mobile Participant</div>
+                    <div class="compare-preview preview-minimal" style="height: 100%;">
+                        <div class="ticket-display">
+                            <div class="ticket-number">5</div>
+                            <div class="ticket-label">tickets</div>
+                        </div>
+                        <div class="status-pill">You're in!</div>
+                    </div>
+                </div>
+
+                <div class="compare-card">
+                    <div class="compare-header">Wheel (Projection)</div>
+                    <div class="compare-preview" style="background: #0F172A; height: 100%;">
+                        <div class="wheel-container">
+                            <div style="position: relative;">
+                                <div class="wheel-pointer" style="border-top-color: var(--celebration);"></div>
+                                <div class="wheel-mockup wheel-modern"></div>
+                                <div class="wheel-center" style="background: #0F172A; color: white; border-color: var(--sky-blue);">GO</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="compare-card">
+                    <div class="compare-header">Winner Celebration</div>
+                    <div class="compare-preview preview-celebration" style="height: 100%;">
+                        <div class="winner-card">
+                            <div class="winner-label">Winner!</div>
+                            <div class="winner-name">Lisa M.</div>
+                            <div class="winner-tickets">8 tickets</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Tab navigation
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.section).classList.add('active');
+            });
+        });
+
+        // Theme toggle
+        document.querySelectorAll('.theme-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                if (btn.dataset.theme === 'dark') {
+                    document.body.classList.add('dark-mode');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
