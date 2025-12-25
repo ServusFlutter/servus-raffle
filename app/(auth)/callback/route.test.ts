@@ -44,7 +44,7 @@ describe("OAuth Callback Handler", () => {
 
     expect(response.status).toBe(307); // Temporary redirect
     expect(response.headers.get("location")).toContain(
-      "/auth/login?error=access_denied"
+      "/login?error=access_denied"
     );
   });
 
@@ -55,7 +55,7 @@ describe("OAuth Callback Handler", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain(
-      "/auth/login?error=missing_code"
+      "/login?error=missing_code"
     );
   });
 
@@ -68,7 +68,7 @@ describe("OAuth Callback Handler", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain(
-      "/auth/login?error=missing_state"
+      "/login?error=missing_state"
     );
   });
 
@@ -82,7 +82,7 @@ describe("OAuth Callback Handler", () => {
     const response = await GET(request);
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/auth/login?error=");
+    expect(response.headers.get("location")).toContain("/login?error=");
     expect(decodeURIComponent(response.headers.get("location") || "")).toContain(
       "Meetup OAuth credentials are not configured"
     );
@@ -98,7 +98,7 @@ describe("OAuth Callback Handler", () => {
     const response = await GET(request);
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/auth/login?error=");
+    expect(response.headers.get("location")).toContain("/login?error=");
     expect(decodeURIComponent(response.headers.get("location") || "")).toContain(
       "Supabase configuration is missing"
     );
@@ -117,7 +117,7 @@ describe("OAuth Callback Handler", () => {
     const response = await GET(request);
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/auth/login?error=");
+    expect(response.headers.get("location")).toContain("/login?error=");
   });
 
   it("should handle Meetup GraphQL API failure", async () => {
@@ -140,7 +140,7 @@ describe("OAuth Callback Handler", () => {
     const response = await GET(request);
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/auth/login?error=");
+    expect(response.headers.get("location")).toContain("/login?error=");
   });
 
   it("should handle invalid profile data from Meetup", async () => {
@@ -163,7 +163,7 @@ describe("OAuth Callback Handler", () => {
     const response = await GET(request);
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/auth/login?error=");
+    expect(response.headers.get("location")).toContain("/login?error=");
   });
 
   it("should fail if profile sync fails", async () => {
@@ -228,7 +228,7 @@ describe("OAuth Callback Handler", () => {
     const response = await GET(request);
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/auth/login?error=");
+    expect(response.headers.get("location")).toContain("/login?error=");
     expect(decodeURIComponent(response.headers.get("location") || "")).toContain(
       "Failed to sync user profile"
     );

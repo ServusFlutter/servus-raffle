@@ -13,21 +13,21 @@ export async function GET(request: NextRequest) {
   if (error) {
     console.error("OAuth error:", error);
     return NextResponse.redirect(
-      new URL(`/auth/login?error=${encodeURIComponent(error)}`, request.url)
+      new URL(`/login?error=${encodeURIComponent(error)}`, request.url)
     );
   }
 
   // Validate required parameters
   if (!code) {
     return NextResponse.redirect(
-      new URL("/auth/login?error=missing_code", request.url)
+      new URL("/login?error=missing_code", request.url)
     );
   }
 
   // Validate state parameter for CSRF protection
   if (!state) {
     return NextResponse.redirect(
-      new URL("/auth/login?error=missing_state", request.url)
+      new URL("/login?error=missing_state", request.url)
     );
   }
 
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
           client_id: clientId,
           client_secret: clientSecret,
           grant_type: "authorization_code",
-          redirect_uri: `${request.nextUrl.origin}/auth/callback`,
+          redirect_uri: `${request.nextUrl.origin}/callback`,
           code,
         }),
       }
@@ -225,7 +225,7 @@ export async function GET(request: NextRequest) {
     const errorMessage =
       err instanceof Error ? err.message : "Authentication failed";
     return NextResponse.redirect(
-      new URL(`/auth/login?error=${encodeURIComponent(errorMessage)}`, request.url)
+      new URL(`/login?error=${encodeURIComponent(errorMessage)}`, request.url)
     );
   }
 }

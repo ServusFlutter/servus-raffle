@@ -26,7 +26,7 @@ export default function LoginPage() {
         throw new Error("Meetup OAuth is not configured. Please set NEXT_PUBLIC_MEETUP_CLIENT_ID.");
       }
 
-      const redirectUri = `${window.location.origin}/auth/callback`;
+      const redirectUri = `${window.location.origin}/callback`;
       const authUrl = new URL("https://secure.meetup.com/oauth2/authorize");
 
       authUrl.searchParams.set("client_id", clientId);

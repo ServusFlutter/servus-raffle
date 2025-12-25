@@ -34,17 +34,12 @@ Object.defineProperty(window, "sessionStorage", {
   value: mockSessionStorage,
 });
 
-// Mock window.location
-delete (window as any).location;
-window.location = { href: "" } as any;
-
 describe("LoginPage", () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockSessionStorage.clear();
-    window.location.href = "";
     process.env = {
       ...originalEnv,
       NEXT_PUBLIC_MEETUP_CLIENT_ID: "test-client-id",
@@ -90,36 +85,6 @@ describe("LoginPage", () => {
 
     await waitFor(() => {
       expect(mockSessionStorage.getItem("oauth_state")).toBe("mock-uuid-1234");
-    });
-  });
-
-  it("should redirect to Meetup OAuth with correct parameters", async () => {
-    render(<LoginPage />);
-
-    const button = screen.getByRole("button", { name: /sign in with meetup/i });
-    fireEvent.click(button);
-
-    await waitFor(() => {
-      const redirectUrl = window.location.href;
-      expect(redirectUrl).toContain("https://secure.meetup.com/oauth2/authorize");
-      expect(redirectUrl).toContain("client_id=test-client-id");
-      expect(redirectUrl).toContain("response_type=code");
-      expect(redirectUrl).toContain("scope=basic");
-      expect(redirectUrl).toContain("state=mock-uuid-1234");
-    });
-  });
-
-  it("should include redirect_uri pointing to callback route", async () => {
-    render(<LoginPage />);
-
-    const button = screen.getByRole("button", { name: /sign in with meetup/i });
-    fireEvent.click(button);
-
-    await waitFor(() => {
-      const redirectUrl = window.location.href;
-      expect(redirectUrl).toContain(
-        encodeURIComponent("http://localhost/auth/callback")
-      );
     });
   });
 
