@@ -13,6 +13,7 @@ interface ParticipantRaffleClientProps {
   raffleName: string;
   raffleStatus: string;
   ticketCount: number;
+  perRaffleTicketCount: number;
   joinedAt: string;
   showJoinedToast?: string;
 }
@@ -26,9 +27,12 @@ export function ParticipantRaffleClient({
   raffleName,
   raffleStatus,
   ticketCount,
+  perRaffleTicketCount,
   joinedAt,
   showJoinedToast,
 }: ParticipantRaffleClientProps) {
+  // Calculate if this is a multi-event user (accumulated tickets differ from per-raffle)
+  const isMultiEventUser = ticketCount > perRaffleTicketCount;
   const router = useRouter();
 
   // Show toast on first join (AC #3, #4)
@@ -76,10 +80,16 @@ export function ParticipantRaffleClient({
           {/* Ticket Count Display - Hero TicketCircle Component (AC #1, #6) */}
           <div className="flex flex-col items-center justify-center py-4">
             <TicketCircle count={ticketCount} size="default" />
-            {/* Contextual Messaging (AC #4, #5) */}
+            {/* Contextual Messaging (Story 3.3 AC #1, #3) - reflects accumulated count */}
             <p className="text-sm text-muted-foreground mt-4 font-medium">
               {getTicketMessage(ticketCount)}
             </p>
+            {/* Show accumulated ticket explanation for multi-event users (Story 3.3 AC #3) */}
+            {isMultiEventUser && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Tickets accumulated across events
+              </p>
+            )}
           </div>
 
           {/* Status */}

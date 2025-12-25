@@ -33,6 +33,11 @@ jest.mock("@/lib/supabase/server", () => ({
   createClient: jest.fn(),
 }));
 
+// Mock the tickets action for accumulated tickets
+jest.mock("@/lib/actions/tickets", () => ({
+  getAccumulatedTickets: jest.fn().mockResolvedValue({ data: 3, error: null }),
+}));
+
 // Mock the client component - simple mock that returns null
 jest.mock("./client", () => ({
   ParticipantRaffleClient: () => null,

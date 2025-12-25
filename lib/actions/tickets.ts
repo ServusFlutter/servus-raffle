@@ -203,3 +203,75 @@ export async function getParticipation(
     return { data: null, error: "Failed to get participation" };
   }
 }
+
+/**
+ * Get accumulated ticket count for the current authenticated user
+ *
+ * Calculates the total ticket count across all raffles the user has participated in,
+ * excluding tickets from before their last win (if any). This implements the
+ * "tickets reset after winning" behavior.
+ *
+ * AC #1: Display accumulated ticket count
+ * AC #2: Exclude won raffle tickets
+ * AC #4: Post-win ticket reset in display
+ * AC #5: Query performance (uses indexed queries)
+ *
+ * @returns ActionResult with accumulated ticket count or error
+ *
+ * @example
+ * const result = await getAccumulatedTickets();
+ * if (result.error) {
+ *   toast.error(result.error);
+ * } else {
+ *   console.log(`You have ${result.data} tickets!`);
+ * }
+ */
+export async function getAccumulatedTickets(): Promise<ActionResult<number>> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { data: null, error: "Not authenticated" };
+    }
+
+    // Step 1: Find user's last win timestamp
+    const { data: lastWin } = await supabase
+      .from("winners")
+      .select("won_at")
+      .eq("user_id", user.id)
+      .order("won_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    // Step 2: Build query for accumulated tickets
+    let query = supabase
+      .from("participants")
+      .select("ticket_count")
+      .eq("user_id", user.id);
+
+    // Step 3: If user has won before, only count tickets after last win
+    if (lastWin?.won_at) {
+      query = query.gt("joined_at", lastWin.won_at);
+    }
+
+    const { data: participations, error } = await query;
+
+    if (error) {
+      console.error("Failed to get accumulated tickets:", error);
+      return { data: null, error: "Failed to get ticket count" };
+    }
+
+    // Sum all ticket counts
+    const total =
+      participations?.reduce((sum, p) => sum + (p.ticket_count || 0), 0) || 0;
+
+    return { data: total, error: null };
+  } catch (e) {
+    console.error("Unexpected error getting accumulated tickets:", e);
+    return { data: null, error: "Failed to get ticket count" };
+  }
+}

@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { joinRaffle, getParticipation } from "./tickets";
+import { joinRaffle, getParticipation, getAccumulatedTickets } from "./tickets";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -310,6 +310,319 @@ describe("Ticket Server Actions", () => {
         expect(result).toEqual({
           data: null,
           error: "Failed to join raffle",
+        });
+      });
+    });
+  });
+
+  describe("getAccumulatedTickets", () => {
+    describe("authentication", () => {
+      it("returns error when user is not authenticated", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: null },
+          error: null,
+        });
+
+        const result = await getAccumulatedTickets();
+
+        expect(result).toEqual({
+          data: null,
+          error: "Not authenticated",
+        });
+      });
+    });
+
+    describe("ticket accumulation", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: validUserId } },
+          error: null,
+        });
+      });
+
+      it("returns 0 for user with no participation", async () => {
+        // Mock winners query (no wins)
+        mockSupabase.single.mockResolvedValueOnce({
+          data: null,
+          error: { code: "PGRST116", message: "Not found" },
+        });
+
+        // Mock participants query (no participations)
+        const mockQuery = {
+          data: [],
+          error: null,
+        };
+        mockSupabase.eq = jest.fn().mockReturnValue({
+          ...mockSupabase,
+          gt: jest.fn().mockResolvedValue(mockQuery),
+        });
+        mockSupabase.from = jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              order: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  single: jest.fn().mockResolvedValue({
+                    data: null,
+                    error: { code: "PGRST116", message: "Not found" },
+                  }),
+                }),
+              }),
+            }),
+          }),
+        });
+
+        const result = await getAccumulatedTickets();
+
+        expect(result.error).toBeNull();
+        expect(result.data).toBe(0);
+      });
+
+      it("returns ticket_count for single raffle participation (no wins)", async () => {
+        // Setup mock chain
+        const winnersQuery = {
+          data: null,
+          error: { code: "PGRST116", message: "Not found" },
+        };
+        const participantsQuery = {
+          data: [{ ticket_count: 1 }],
+          error: null,
+        };
+
+        mockSupabase.from = jest.fn().mockImplementation((table: string) => {
+          if (table === "winners") {
+            return {
+              select: jest.fn().mockReturnValue({
+                eq: jest.fn().mockReturnValue({
+                  order: jest.fn().mockReturnValue({
+                    limit: jest.fn().mockReturnValue({
+                      single: jest.fn().mockResolvedValue(winnersQuery),
+                    }),
+                  }),
+                }),
+              }),
+            };
+          }
+          // participants table
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue(participantsQuery),
+            }),
+          };
+        });
+
+        const result = await getAccumulatedTickets();
+
+        expect(result.error).toBeNull();
+        expect(result.data).toBe(1);
+      });
+
+      it("sums tickets across multiple raffles (no wins)", async () => {
+        // User joined 3 raffles with 1 ticket each = 3 total
+        const winnersQuery = {
+          data: null,
+          error: { code: "PGRST116", message: "Not found" },
+        };
+        const participantsQuery = {
+          data: [{ ticket_count: 1 }, { ticket_count: 1 }, { ticket_count: 1 }],
+          error: null,
+        };
+
+        mockSupabase.from = jest.fn().mockImplementation((table: string) => {
+          if (table === "winners") {
+            return {
+              select: jest.fn().mockReturnValue({
+                eq: jest.fn().mockReturnValue({
+                  order: jest.fn().mockReturnValue({
+                    limit: jest.fn().mockReturnValue({
+                      single: jest.fn().mockResolvedValue(winnersQuery),
+                    }),
+                  }),
+                }),
+              }),
+            };
+          }
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue(participantsQuery),
+            }),
+          };
+        });
+
+        const result = await getAccumulatedTickets();
+
+        expect(result.error).toBeNull();
+        expect(result.data).toBe(3);
+      });
+
+      it("excludes tickets from before last win", async () => {
+        // User won on Day 3, only count tickets from Day 4+
+        const lastWinDate = "2025-12-23T12:00:00Z";
+        const winnersQuery = {
+          data: { won_at: lastWinDate },
+          error: null,
+        };
+        // Only 2 participations after the win
+        const participantsQuery = {
+          data: [{ ticket_count: 1 }, { ticket_count: 1 }],
+          error: null,
+        };
+
+        mockSupabase.from = jest.fn().mockImplementation((table: string) => {
+          if (table === "winners") {
+            return {
+              select: jest.fn().mockReturnValue({
+                eq: jest.fn().mockReturnValue({
+                  order: jest.fn().mockReturnValue({
+                    limit: jest.fn().mockReturnValue({
+                      single: jest.fn().mockResolvedValue(winnersQuery),
+                    }),
+                  }),
+                }),
+              }),
+            };
+          }
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                gt: jest.fn().mockResolvedValue(participantsQuery),
+              }),
+            }),
+          };
+        });
+
+        const result = await getAccumulatedTickets();
+
+        expect(result.error).toBeNull();
+        expect(result.data).toBe(2);
+      });
+
+      it("returns 0 immediately after winning (no new participations)", async () => {
+        // User just won with 5 tickets, now has 0 because no new participations
+        const lastWinDate = "2025-12-25T10:00:00Z";
+        const winnersQuery = {
+          data: { won_at: lastWinDate },
+          error: null,
+        };
+        const participantsQuery = {
+          data: [],
+          error: null,
+        };
+
+        mockSupabase.from = jest.fn().mockImplementation((table: string) => {
+          if (table === "winners") {
+            return {
+              select: jest.fn().mockReturnValue({
+                eq: jest.fn().mockReturnValue({
+                  order: jest.fn().mockReturnValue({
+                    limit: jest.fn().mockReturnValue({
+                      single: jest.fn().mockResolvedValue(winnersQuery),
+                    }),
+                  }),
+                }),
+              }),
+            };
+          }
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                gt: jest.fn().mockResolvedValue(participantsQuery),
+              }),
+            }),
+          };
+        });
+
+        const result = await getAccumulatedTickets();
+
+        expect(result.error).toBeNull();
+        expect(result.data).toBe(0);
+      });
+
+      it("accumulates new tickets after winning", async () => {
+        // User won, then joined 2 more raffles = 2 total
+        const lastWinDate = "2025-12-20T10:00:00Z";
+        const winnersQuery = {
+          data: { won_at: lastWinDate },
+          error: null,
+        };
+        const participantsQuery = {
+          data: [{ ticket_count: 1 }, { ticket_count: 1 }],
+          error: null,
+        };
+
+        mockSupabase.from = jest.fn().mockImplementation((table: string) => {
+          if (table === "winners") {
+            return {
+              select: jest.fn().mockReturnValue({
+                eq: jest.fn().mockReturnValue({
+                  order: jest.fn().mockReturnValue({
+                    limit: jest.fn().mockReturnValue({
+                      single: jest.fn().mockResolvedValue(winnersQuery),
+                    }),
+                  }),
+                }),
+              }),
+            };
+          }
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                gt: jest.fn().mockResolvedValue(participantsQuery),
+              }),
+            }),
+          };
+        });
+
+        const result = await getAccumulatedTickets();
+
+        expect(result.error).toBeNull();
+        expect(result.data).toBe(2);
+      });
+    });
+
+    describe("database errors", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: validUserId } },
+          error: null,
+        });
+      });
+
+      it("returns error on participants query failure", async () => {
+        const winnersQuery = {
+          data: null,
+          error: { code: "PGRST116", message: "Not found" },
+        };
+        const participantsQuery = {
+          data: null,
+          error: { message: "Database error" },
+        };
+
+        mockSupabase.from = jest.fn().mockImplementation((table: string) => {
+          if (table === "winners") {
+            return {
+              select: jest.fn().mockReturnValue({
+                eq: jest.fn().mockReturnValue({
+                  order: jest.fn().mockReturnValue({
+                    limit: jest.fn().mockReturnValue({
+                      single: jest.fn().mockResolvedValue(winnersQuery),
+                    }),
+                  }),
+                }),
+              }),
+            };
+          }
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue(participantsQuery),
+            }),
+          };
+        });
+
+        const result = await getAccumulatedTickets();
+
+        expect(result).toEqual({
+          data: null,
+          error: "Failed to get ticket count",
         });
       });
     });

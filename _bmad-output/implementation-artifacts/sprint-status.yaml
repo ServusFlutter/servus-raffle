@@ -60,7 +60,7 @@ development_status:
   epic-3: in-progress
   3-1-qr-code-join-flow-and-participant-registration: done
   3-2-ticket-display-with-ticketcircle-component: done
-  3-3-ticket-accumulation-across-events: backlog
+  3-3-ticket-accumulation-across-events: done
   3-4-ticket-confirmation-and-status-feedback: backlog
   epic-3-retrospective: optional
 

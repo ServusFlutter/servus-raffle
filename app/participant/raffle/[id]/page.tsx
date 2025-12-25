@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { ParticipantRaffleClient } from "./client";
+import { getAccumulatedTickets } from "@/lib/actions/tickets";
 
 interface ParticipantRafflePageProps {
   params: Promise<{ id: string }>;
@@ -73,12 +74,17 @@ export default async function ParticipantRafflePage({
     .eq("id", id)
     .single();
 
+  // Get accumulated ticket count across all events (Story 3.3)
+  const accumulatedResult = await getAccumulatedTickets();
+  const accumulatedTickets = accumulatedResult.data ?? participation.ticket_count;
+
   return (
     <ParticipantRaffleClient
       raffleId={id}
       raffleName={raffle?.name || "Raffle"}
       raffleStatus={raffle?.status || "active"}
-      ticketCount={participation.ticket_count}
+      ticketCount={accumulatedTickets}
+      perRaffleTicketCount={participation.ticket_count}
       joinedAt={participation.joined_at}
       showJoinedToast={joined}
     />

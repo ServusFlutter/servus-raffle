@@ -26,6 +26,7 @@ describe("ParticipantRaffleClient", () => {
     raffleName: "Flutter Munich Raffle",
     raffleStatus: "active",
     ticketCount: 3,
+    perRaffleTicketCount: 1,
     joinedAt: "2025-12-25T10:00:00Z",
   };
 
@@ -96,6 +97,33 @@ describe("ParticipantRaffleClient", () => {
       expect(
         screen.getByText("Join a raffle to get started!")
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("Accumulated Tickets Display (Story 3.3)", () => {
+    it("shows accumulated message for multi-event users (AC #3)", () => {
+      render(<ParticipantRaffleClient {...defaultProps} ticketCount={3} />);
+
+      expect(
+        screen.getByText("Tickets accumulated across events")
+      ).toBeInTheDocument();
+    });
+
+    it("does not show accumulated message for single ticket", () => {
+      render(<ParticipantRaffleClient {...defaultProps} ticketCount={1} />);
+
+      expect(
+        screen.queryByText("Tickets accumulated across events")
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows accumulated message for 5th event user (AC #3)", () => {
+      render(<ParticipantRaffleClient {...defaultProps} ticketCount={5} />);
+
+      expect(
+        screen.getByText("Tickets accumulated across events")
+      ).toBeInTheDocument();
+      expect(screen.getByText("Looking strong!")).toBeInTheDocument();
     });
   });
 
