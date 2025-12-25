@@ -5,6 +5,7 @@ description: 'Autonomous epic execution - chains create-story, dev-story, code-r
 # Sprint Orchestrator
 
 You are the **orchestrator**. Your ONLY job is to:
+
 1. Read sprint status to understand current state
 2. Make decisions about what to do next
 3. Spawn sub-agents to do the actual work
@@ -27,6 +28,7 @@ sprint_status_file: _bmad-output/implementation-artifacts/sprint-status.yaml
 max_iterations: 100
 mode: autonomous
 parallelism: enabled
+auto_commit: true # Commit after each story completion
 ```
 
 ## Orchestration Loop
@@ -36,11 +38,13 @@ Execute these steps in order, looping until the epic is complete:
 ### Step 1: Initialize
 
 Read the sprint status file completely:
+
 ```
 _bmad-output/implementation-artifacts/sprint-status.yaml
 ```
 
 Parse the `development_status` section to understand:
+
 - Which epic is currently in-progress
 - Status of each story (backlog, ready-for-dev, in-progress, review, done)
 
@@ -49,11 +53,13 @@ Set `iteration = 0`.
 ### Step 2: Identify Current Epic
 
 Find the current epic to work on:
+
 1. Look for epics with status "in-progress"
 2. If none, find first epic with stories not all "done"
 3. This is your `current_epic`
 
 Count stories in `current_epic` by status:
+
 - `backlog_count`: Stories not yet created
 - `ready_count`: Stories created, waiting for development
 - `in_progress_count`: Stories being developed
@@ -63,6 +69,7 @@ Count stories in `current_epic` by status:
 ### Step 3: Check Completion
 
 If ALL stories in `current_epic` have status "done":
+
 - Update epic status to "done" in sprint-status.yaml
 - Report: "Epic {current_epic} COMPLETE!"
 - STOP orchestration
@@ -86,9 +93,57 @@ For EACH story with status "review":
 Wait for ALL review agents to complete using TaskOutput.
 
 For each review result:
+
 - If HIGH or MEDIUM issues found: story stays in-progress (will be fixed in dev phase)
 - If only LOW issues found: Apply AI judgment (see LOW Severity Judgment below)
 - If review passed: story is marked "done"
+
+### Step 4.5: Commit Completed Stories
+
+For each story that was just marked "done" in Step 4:
+
+1. Read the story file to extract:
+
+   - Story title
+   - Completed tasks list
+   - File List (new/modified/deleted files)
+   - Change Log entries
+   - Any review findings that were fixed (from FIXED_FINDINGS)
+
+2. Check if this is the last story in the epic (all other stories are "done")
+
+3. Stage all changes and create commit:
+
+```bash
+git add -A
+git commit -m "$(cat <<'EOF'
+feat({{story_key}}): {{story_title}}
+
+## Tasks Completed
+- [x] Task 1 description
+- [x] Task 2 description
+...
+
+## Files Changed
+- lib/path/to/file.ts (new)
+- lib/another/file.ts (modified)
+
+## Review Findings Fixed
+- Fixed: [description of HIGH/MEDIUM issue]
+
+{{IF last story in epic}}
+---
+✅ Epic {{epic_number}} Complete: {{epic_title}}
+{{END IF}}
+EOF
+)"
+```
+
+This ensures each completed story has its own isolated commit for:
+
+- Easy rollback if issues are found
+- Clear git history per feature
+- Bisect-friendly debugging
 
 ### Step 5: Process Development (SEQUENTIAL)
 
@@ -127,6 +182,7 @@ Launch Task tool with:
 Increment `iteration`.
 
 If `iteration >= max_iterations`:
+
 - Report: "SAFETY HALT: Max iterations reached"
 - STOP orchestration
 
@@ -235,6 +291,7 @@ Return a structured summary:
 - MEDIUM_COUNT: number
 - LOW_COUNT: number
 - LOW_FINDINGS: list of LOW severity findings (for orchestrator judgment)
+- FIXED_FINDINGS: list of HIGH/MEDIUM issues that were auto-fixed (for commit message)
 - FINAL_STATUS: done or in-progress
 ```
 
@@ -244,21 +301,23 @@ Return a structured summary:
 
 When code-review returns only LOW severity findings, the orchestrator evaluates each:
 
-| Finding Type | Decision | Reason |
-|--------------|----------|--------|
-| Affects functionality/correctness | FIX | Impacts user experience |
-| Security or reliability concern | FIX | Risk mitigation |
-| Test coverage for critical path | FIX | Quality assurance |
-| Purely stylistic (formatting) | SKIP | No functional impact |
-| Documentation without code impact | SKIP | Can be done later |
-| Minor optimization (negligible) | SKIP | Over-engineering |
+| Finding Type                      | Decision | Reason                  |
+| --------------------------------- | -------- | ----------------------- |
+| Affects functionality/correctness | FIX      | Impacts user experience |
+| Security or reliability concern   | FIX      | Risk mitigation         |
+| Test coverage for critical path   | FIX      | Quality assurance       |
+| Purely stylistic (formatting)     | SKIP     | No functional impact    |
+| Documentation without code impact | SKIP     | Can be done later       |
+| Minor optimization (negligible)   | SKIP     | Over-engineering        |
 
 If ANY LOW findings are marked FIX:
+
 - Keep story in "in-progress"
 - Add findings to story's Tasks as action items
 - Loop will pick up the story for fixes
 
 If ALL LOW findings are SKIP:
+
 - Mark story as "done"
 - Proceed to next story
 
@@ -267,6 +326,7 @@ If ALL LOW findings are SKIP:
 ## Error Handling
 
 If a sub-agent fails:
+
 1. Log the error
 2. Retry up to 3 times for the same operation
 3. If still failing after 3 retries:
@@ -278,6 +338,7 @@ If a sub-agent fails:
 ## Example Execution
 
 Given sprint-status.yaml shows:
+
 ```yaml
 development_status:
   epic-1: in-progress
@@ -288,6 +349,7 @@ development_status:
 ```
 
 Orchestrator actions:
+
 1. **Step 2**: Current epic = 1, stories: done=1, review=2, in-progress=1
 2. **Step 3**: Not all done, continue
 3. **Step 4**: Launch 2 review agents IN PARALLEL for 1-2 and 1-3

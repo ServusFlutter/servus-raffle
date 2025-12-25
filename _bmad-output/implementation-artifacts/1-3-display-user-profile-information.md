@@ -5,8 +5,10 @@ Status: done
 ## Story
 
 As a **logged-in user**,
-I want **to see my profile information from Meetup**,
+I want **to see my profile information**,
 So that **I know I'm signed in with the correct account**.
+
+<!-- Note: Originally referenced Meetup OAuth, updated for email/password auth pivot -->
 
 ## Acceptance Criteria
 

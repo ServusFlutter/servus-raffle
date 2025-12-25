@@ -13,14 +13,15 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signIn } from "@/lib/actions/auth";
+import { signUp } from "@/lib/actions/auth";
 
-export default function LoginPage() {
+export default function SignUpPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,14 +29,14 @@ export default function LoginPage() {
     setError(null);
 
     // Client-side validation
-    if (!email.trim()) {
-      setError("Email is required");
+    if (!name.trim()) {
+      setError("Name is required");
       setIsLoading(false);
       return;
     }
 
-    if (!password) {
-      setError("Password is required");
+    if (!email.trim()) {
+      setError("Email is required");
       setIsLoading(false);
       return;
     }
@@ -48,8 +49,21 @@ export default function LoginPage() {
       return;
     }
 
+    if (!password) {
+      setError("Password is required");
+      setIsLoading(false);
+      return;
+    }
+
+    // Password strength validation (minimum 8 characters recommended)
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const result = await signIn(email, password);
+      const result = await signUp(email, password, name);
 
       if (result.error) {
         setError(result.error);
@@ -57,7 +71,7 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect to participant dashboard on success
+      // Redirect to participant dashboard on success (auto-login)
       router.push("/participant");
       router.refresh();
     } catch {
@@ -71,13 +85,27 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Welcome to Servus Raffle</CardTitle>
+            <CardTitle className="text-2xl">Create an Account</CardTitle>
             <CardDescription>
-              Sign in with your email and password to participate in the raffle
+              Sign up to participate in the Servus Raffle
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={isLoading}
+                  autoComplete="name"
+                  required
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -97,13 +125,17 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Enter your password"
+                  placeholder="At least 8 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   required
+                  minLength={8}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Must be at least 8 characters
+                </p>
               </div>
 
               <Button
@@ -112,7 +144,7 @@ export default function LoginPage() {
                 className="w-full"
                 size="lg"
               >
-                {isLoading ? "Signing in..." : "Sign In"}
+                {isLoading ? "Creating account..." : "Sign Up"}
               </Button>
 
               {error && (
@@ -123,18 +155,18 @@ export default function LoginPage() {
 
               <div className="text-center text-sm">
                 <span className="text-muted-foreground">
-                  Don&apos;t have an account?{" "}
+                  Already have an account?{" "}
                 </span>
                 <Link
-                  href="/signup"
+                  href="/login"
                   className="font-medium text-primary underline-offset-4 hover:underline"
                 >
-                  Sign Up
+                  Sign In
                 </Link>
               </div>
 
               <p className="text-center text-xs text-muted-foreground">
-                By signing in, you agree to participate in the raffle
+                By signing up, you agree to participate in the raffle
               </p>
             </form>
           </CardContent>

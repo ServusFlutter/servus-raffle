@@ -5,116 +5,165 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import LoginPage from "./page";
 
-// Mock crypto.randomUUID
-Object.defineProperty(global, "crypto", {
-  value: {
-    randomUUID: jest.fn(() => "mock-uuid-1234"),
-  },
-});
+// Mock useRouter
+const mockPush = jest.fn();
+const mockRefresh = jest.fn();
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: mockPush,
+    refresh: mockRefresh,
+  }),
+}));
 
-// Mock sessionStorage
-const mockSessionStorage = (() => {
-  let store: Record<string, string> = {};
-
-  return {
-    getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => {
-      store[key] = value;
-    },
-    removeItem: (key: string) => {
-      delete store[key];
-    },
-    clear: () => {
-      store = {};
-    },
-  };
-})();
-
-Object.defineProperty(window, "sessionStorage", {
-  value: mockSessionStorage,
-});
+// Mock signIn action
+const mockSignIn = jest.fn();
+jest.mock("@/lib/actions/auth", () => ({
+  signIn: (...args: unknown[]) => mockSignIn(...args),
+}));
 
 describe("LoginPage", () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSessionStorage.clear();
-    process.env = {
-      ...originalEnv,
-      NEXT_PUBLIC_MEETUP_CLIENT_ID: "test-client-id",
-    };
   });
 
-  afterEach(() => {
-    process.env = originalEnv;
-  });
-
-  it("should render login page with Meetup button", () => {
+  it("should render login page with email/password form", () => {
     render(<LoginPage />);
 
     expect(screen.getByText("Welcome to Servus Raffle")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Sign in with your Meetup.com account to participate in the raffle"
+        "Sign in with your email and password to participate in the raffle"
       )
     ).toBeInTheDocument();
-    expect(screen.getByText("Sign in with Meetup")).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign In" })).toBeInTheDocument();
   });
 
-  it("should show error when MEETUP_CLIENT_ID is not configured", async () => {
-    delete process.env.NEXT_PUBLIC_MEETUP_CLIENT_ID;
-
+  it("should show error when email is empty", async () => {
     render(<LoginPage />);
 
-    const button = screen.getByRole("button", { name: /sign in with meetup/i });
+    const button = screen.getByRole("button", { name: "Sign In" });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByText("Email is required")).toBeInTheDocument();
+    });
+
+    expect(mockSignIn).not.toHaveBeenCalled();
+  });
+
+  it("should show error when password is empty", async () => {
+    render(<LoginPage />);
+
+    const emailInput = screen.getByLabelText("Email");
+    fireEvent.change(emailInput, { target: { value: "test@example.com" } });
+
+    const button = screen.getByRole("button", { name: "Sign In" });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByText("Password is required")).toBeInTheDocument();
+    });
+
+    expect(mockSignIn).not.toHaveBeenCalled();
+  });
+
+  it("should show error for invalid email format", async () => {
+    render(<LoginPage />);
+
+    const emailInput = screen.getByLabelText("Email");
+    const passwordInput = screen.getByLabelText("Password");
+
+    fireEvent.change(emailInput, { target: { value: "invalid-email" } });
+    fireEvent.change(passwordInput, { target: { value: "password123" } });
+
+    const button = screen.getByRole("button", { name: "Sign In" });
     fireEvent.click(button);
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Meetup OAuth is not configured/)
+        screen.getByText("Please enter a valid email address")
       ).toBeInTheDocument();
     });
+
+    expect(mockSignIn).not.toHaveBeenCalled();
   });
 
-  it("should set CSRF state in sessionStorage when initiating OAuth", async () => {
-    render(<LoginPage />);
-
-    const button = screen.getByRole("button", { name: /sign in with meetup/i });
-    fireEvent.click(button);
-
-    await waitFor(() => {
-      expect(mockSessionStorage.getItem("oauth_state")).toBe("mock-uuid-1234");
-    });
-  });
-
-  it("should disable button and show loading state during sign in", async () => {
-    render(<LoginPage />);
-
-    const button = screen.getByRole("button", { name: /sign in with meetup/i });
-    fireEvent.click(button);
-
-    // Button should show loading state
-    await waitFor(() => {
-      expect(screen.getByText("Connecting...")).toBeInTheDocument();
-    });
-  });
-
-  it("should handle errors gracefully", async () => {
-    // Override crypto to throw error
-    (global.crypto.randomUUID as jest.Mock).mockImplementation(() => {
-      throw new Error("Test error");
-    });
+  it("should call signIn and redirect on successful login", async () => {
+    mockSignIn.mockResolvedValue({ data: { id: "user-123" }, error: null });
 
     render(<LoginPage />);
 
-    const button = screen.getByRole("button", { name: /sign in with meetup/i });
+    const emailInput = screen.getByLabelText("Email");
+    const passwordInput = screen.getByLabelText("Password");
+
+    fireEvent.change(emailInput, { target: { value: "test@example.com" } });
+    fireEvent.change(passwordInput, { target: { value: "password123" } });
+
+    const button = screen.getByRole("button", { name: "Sign In" });
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByText("Test error")).toBeInTheDocument();
-      expect(button).not.toBeDisabled();
+      expect(mockSignIn).toHaveBeenCalledWith("test@example.com", "password123");
     });
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith("/participant");
+      expect(mockRefresh).toHaveBeenCalled();
+    });
+  });
+
+  it("should show error message from signIn action", async () => {
+    mockSignIn.mockResolvedValue({
+      data: null,
+      error: "Invalid email or password",
+    });
+
+    render(<LoginPage />);
+
+    const emailInput = screen.getByLabelText("Email");
+    const passwordInput = screen.getByLabelText("Password");
+
+    fireEvent.change(emailInput, { target: { value: "test@example.com" } });
+    fireEvent.change(passwordInput, { target: { value: "wrongpassword" } });
+
+    const button = screen.getByRole("button", { name: "Sign In" });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByText("Invalid email or password")).toBeInTheDocument();
+    });
+
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("should show loading state during sign in", async () => {
+    mockSignIn.mockImplementation(
+      () => new Promise((resolve) => setTimeout(resolve, 100))
+    );
+
+    render(<LoginPage />);
+
+    const emailInput = screen.getByLabelText("Email");
+    const passwordInput = screen.getByLabelText("Password");
+
+    fireEvent.change(emailInput, { target: { value: "test@example.com" } });
+    fireEvent.change(passwordInput, { target: { value: "password123" } });
+
+    const button = screen.getByRole("button", { name: "Sign In" });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByText("Signing in...")).toBeInTheDocument();
+    });
+  });
+
+  it("should have link to sign up page", () => {
+    render(<LoginPage />);
+
+    const signUpLink = screen.getByRole("link", { name: "Sign Up" });
+    expect(signUpLink).toHaveAttribute("href", "/signup");
   });
 
   it("should render privacy notice", () => {
@@ -123,5 +172,26 @@ describe("LoginPage", () => {
     expect(
       screen.getByText(/By signing in, you agree to participate/i)
     ).toBeInTheDocument();
+  });
+
+  it("should handle unexpected errors gracefully", async () => {
+    mockSignIn.mockRejectedValue(new Error("Network error"));
+
+    render(<LoginPage />);
+
+    const emailInput = screen.getByLabelText("Email");
+    const passwordInput = screen.getByLabelText("Password");
+
+    fireEvent.change(emailInput, { target: { value: "test@example.com" } });
+    fireEvent.change(passwordInput, { target: { value: "password123" } });
+
+    const button = screen.getByRole("button", { name: "Sign In" });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("An unexpected error occurred. Please try again.")
+      ).toBeInTheDocument();
+    });
   });
 });
