@@ -57,7 +57,7 @@ The core philosophy: **fairness through persistence**. First-timers have a chanc
 Servus Raffle has two distinct core experiences that must both succeed:
 
 **Utility Core: Frictionless Participation**
-The QR scan → OAuth → ticket confirmation flow must complete in under 30 seconds. This is the gateway - if it fails, nothing else matters. Users scan, tap once for Meetup.com OAuth, and immediately see "You have X tickets."
+The QR scan → sign-in → ticket confirmation flow must complete in under 30 seconds. This is the gateway - if it fails, nothing else matters. Users scan, sign in with email/password, and immediately see "You have X tickets."
 
 **Emotional Core: Synchronized Spectacle**
 The wheel spin → winner reveal is why the product exists. This 5-second animation, synchronized across 50+ devices, creates the shared community moment that makes the raffle memorable. Everyone watches together - on their phones and on the big screen.
@@ -226,7 +226,7 @@ The utility core enables participation. The emotional core delivers value.
 
 | Avoid | Because | Instead |
 |-------|---------|---------|
-| Account creation forms | Kills event participation | OAuth only |
+| Complex account forms | Kills event participation | Minimal required fields |
 | Ambiguous loading states | Creates real-time anxiety | Skeleton UI, optimistic updates |
 | Desynchronized reveals | Ruins shared moment | WebSocket sync <500ms |
 | Small text/touch targets | Unusable at events | Mobile-first, large elements |
@@ -637,10 +637,10 @@ flowchart TD
     A[Sees QR on screen] --> B[Scans with phone camera]
     B --> C[Opens raffle URL]
     C --> D{Already logged in?}
-    D -->|No| E[Landing: 'Sign in with Meetup']
+    D -->|No| E[Landing: 'Sign In / Sign Up']
     D -->|Yes| J[Dashboard with ticket count]
-    E --> F[Tap OAuth button]
-    F --> G[Meetup OAuth popup]
+    E --> F[Enter email/password]
+    F --> G[Submit form]
     G --> H{Auth successful?}
     H -->|Yes| I[Redirect + ticket granted]
     H -->|No| K[Error: 'Try again']
@@ -651,7 +651,7 @@ flowchart TD
 
 **Key decisions:**
 - QR opens directly to raffle (no homepage detour)
-- Single OAuth button - no account creation forms
+- Simple sign-in/sign-up with minimal fields (email, password, name)
 - Ticket granted automatically on successful auth
 - Immediate confirmation with ticket count
 - Status bar shows "Locked in" state
@@ -964,7 +964,7 @@ npx shadcn-ui@latest add button card dialog input label badge skeleton toast ava
 
 | Context | Primary | Secondary | Avoid |
 |---------|---------|-----------|-------|
-| Participant landing | Sign in with Meetup | - | Multiple CTAs |
+| Participant landing | Sign In | - | Multiple CTAs |
 | Participant dashboard | - (just watching) | - | Any buttons |
 | Admin setup | Create Raffle | Add Prize | Too many options |
 | Admin live | Draw Winner | Next Prize | Distractions |
@@ -1319,10 +1319,10 @@ This ensures the product is accessible to users with disabilities while being ac
 
 <!-- Interactive elements -->
 <button
-  aria-label="Sign in with Meetup"
+  aria-label="Sign in"
   class="focus:ring-2 focus:ring-primary focus:ring-offset-2"
 >
-  Sign in with Meetup
+  Sign In
 </button>
 
 <!-- Status updates -->

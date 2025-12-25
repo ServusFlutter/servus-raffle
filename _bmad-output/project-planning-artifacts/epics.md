@@ -21,8 +21,8 @@ This document provides the complete epic and story breakdown for servus-raffle, 
 ### Functional Requirements
 
 **User Authentication & Registration (FR1-5)**
-- FR1: Users can authenticate using their Meetup.com account via OAuth
-- FR2: Users can view their profile information pulled from Meetup.com
+- FR1: Users can authenticate using email and password
+- FR2: Users can view their profile information (name, avatar)
 - FR3: Users can see their current ticket count immediately after logging in
 - FR4: Users can log out of the system
 - FR5: System can identify returning users and restore their ticket history
@@ -89,7 +89,7 @@ This document provides the complete epic and story breakdown for servus-raffle, 
 - NFR10: Recovery time < 30 seconds
 
 **Integration**
-- NFR11: Meetup.com OAuth 2.0 authentication
+- NFR11: Supabase email/password authentication
 - NFR12: Supabase for database and real-time features
 - NFR13: Client-side QR code generation
 
@@ -146,8 +146,8 @@ This document provides the complete epic and story breakdown for servus-raffle, 
 
 | FR | Epic | Description |
 |----|------|-------------|
-| FR1 | Epic 1 | Meetup.com OAuth authentication |
-| FR2 | Epic 1 | View profile information from Meetup |
+| FR1 | Epic 1 | Email/password authentication |
+| FR2 | Epic 1 | View profile information |
 | FR3 | Epic 3 | See ticket count after logging in |
 | FR4 | Epic 1 | Log out of the system |
 | FR5 | Epic 1 | Identify returning users, restore ticket history |
@@ -191,7 +191,7 @@ This document provides the complete epic and story breakdown for servus-raffle, 
 
 ### Epic 1: Project Foundation & User Authentication
 
-**Goal:** Users can sign in with their Meetup account and see their profile. This epic initializes the project using the official starter template and implements the authentication system that all other features depend on.
+**Goal:** Users can sign in with email/password and see their profile. This epic initializes the project using the official starter template and implements the authentication system that all other features depend on.
 
 **FRs covered:** FR1, FR2, FR4, FR5
 
@@ -239,7 +239,7 @@ This document provides the complete epic and story breakdown for servus-raffle, 
 
 ## Epic 1: Project Foundation & User Authentication
 
-**Goal:** Users can sign in with their Meetup account and see their profile. This epic initializes the project using the official starter template and implements the authentication system that all other features depend on.
+**Goal:** Users can sign in with email/password and see their profile. This epic initializes the project using the official starter template and implements the authentication system that all other features depend on.
 
 ### Story 1.1: Initialize Project with Starter Template
 
@@ -271,38 +271,39 @@ So that **I have a solid foundation with pre-configured authentication patterns 
 
 ---
 
-### Story 1.2: Implement Meetup OAuth Authentication
+### Story 1.2: Implement Email/Password Authentication
 
 As a **meetup attendee**,
-I want **to sign in using my Meetup.com account**,
-So that **I can participate in the raffle without creating a new account**.
+I want **to sign in using email and password**,
+So that **I can participate in the raffle with a simple account**.
 
 **Acceptance Criteria:**
 
 **Given** the Supabase project
-**When** the developer configures Meetup OAuth provider
-**Then** Supabase Auth is configured with Meetup OAuth credentials (`MEETUP_CLIENT_ID`, `MEETUP_CLIENT_SECRET`)
-**And** the OAuth callback URL is properly set up
+**When** authentication is configured
+**Then** Supabase Auth email/password provider is enabled
+**And** email confirmation is disabled for MVP simplicity
 
 **Given** the database
 **When** the users table is created
-**Then** the `users` table exists with columns: `id` (uuid), `meetup_id` (text unique), `name` (text), `avatar_url` (text), `created_at` (timestamptz)
+**Then** the `users` table exists with columns: `id` (uuid), `email` (text unique), `name` (text), `avatar_url` (text nullable), `created_at` (timestamptz)
 **And** RLS policies allow users to read their own record
 
 **Given** an unauthenticated user on the login page
-**When** they click "Sign in with Meetup"
-**Then** they are redirected to Meetup.com OAuth consent screen
-**And** after granting permission, they are redirected back to the application
-
-**Given** a successful OAuth callback
-**When** the user is authenticated
-**Then** their Meetup profile (name, avatar) is stored in the `users` table
-**And** they are redirected to the participant dashboard
+**When** they enter email and password and click "Sign In"
+**Then** they are authenticated via Supabase Auth
+**And** redirected to the participant dashboard
 **And** a session cookie is set for persistent authentication
 
-**Given** a returning user who previously authenticated
-**When** they sign in again
-**Then** the system identifies them by their `meetup_id`
+**Given** a new user
+**When** they click "Sign Up"
+**Then** they see a registration form with email, password, and name fields
+**And** after successful registration, they are logged in automatically
+**And** a user record is created in the users table
+
+**Given** a returning user
+**When** they sign in with their email/password
+**Then** the system identifies them by their email
 **And** their existing user record is used (not duplicated)
 
 ---
@@ -317,10 +318,10 @@ So that **I know I'm signed in with the correct account**.
 
 **Given** an authenticated user
 **When** they view the participant dashboard
-**Then** their name from Meetup is displayed
-**And** their avatar image from Meetup is displayed
+**Then** their name is displayed
+**And** their avatar image is displayed (or default placeholder)
 
-**Given** a user without an avatar on Meetup
+**Given** a user without an avatar
 **When** they view their profile
 **Then** a default avatar placeholder is shown
 **And** no broken image is displayed
