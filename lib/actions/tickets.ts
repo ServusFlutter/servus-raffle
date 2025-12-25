@@ -1,0 +1,205 @@
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
+import {
+  JoinRaffleSchema,
+  type Participant,
+} from "@/lib/schemas/participant";
+import { revalidatePath } from "next/cache";
+
+// Re-export Participant type for consumers of this module
+export type { Participant };
+
+/**
+ * ActionResult type for consistent Server Action responses
+ * Following project pattern: ALWAYS return { data, error } - NEVER throw
+ */
+type ActionResult<T> = {
+  data: T | null;
+  error: string | null;
+};
+
+/**
+ * Join result includes participant data and whether this was a new join
+ */
+export type JoinRaffleResult = {
+  participant: Participant;
+  isNewJoin: boolean;
+};
+
+/**
+ * Join a raffle as the current authenticated user
+ *
+ * Handles the complete join flow:
+ * 1. Validates raffle ID format
+ * 2. Verifies user is authenticated
+ * 3. Checks raffle exists and is active
+ * 4. Uses upsert to handle duplicate joins gracefully (AC #4)
+ * 5. Returns participant record with ticket count
+ *
+ * @param raffleId - UUID of the raffle to join
+ * @returns ActionResult with JoinRaffleResult or error
+ *
+ * @example
+ * const result = await joinRaffle("123e4567-e89b-12d3-a456-426614174000");
+ * if (result.error) {
+ *   toast.error(result.error);
+ * } else {
+ *   redirect(`/participant/raffle/${result.data.participant.raffle_id}`);
+ * }
+ */
+export async function joinRaffle(
+  raffleId: string
+): Promise<ActionResult<JoinRaffleResult>> {
+  try {
+    // Validate input
+    const parsed = JoinRaffleSchema.safeParse({ raffleId });
+    if (!parsed.success) {
+      return { data: null, error: "Invalid raffle ID" };
+    }
+
+    const supabase = await createClient();
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { data: null, error: "Not authenticated" };
+    }
+
+    // Check raffle exists and is active
+    const { data: raffle, error: raffleError } = await supabase
+      .from("raffles")
+      .select("id, status, qr_code_expires_at")
+      .eq("id", raffleId)
+      .single();
+
+    if (raffleError || !raffle) {
+      return { data: null, error: "Raffle not found" };
+    }
+
+    if (raffle.status !== "active") {
+      return { data: null, error: "Raffle is not active" };
+    }
+
+    // Check for existing participation first
+    const { data: existingParticipant } = await supabase
+      .from("participants")
+      .select("*")
+      .eq("raffle_id", raffleId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (existingParticipant) {
+      // Already joined - return existing record (AC #4)
+      revalidatePath(`/participant/raffle/${raffleId}`);
+      return {
+        data: {
+          participant: existingParticipant,
+          isNewJoin: false,
+        },
+        error: null,
+      };
+    }
+
+    // Insert new participant record
+    const { data: newParticipant, error: insertError } = await supabase
+      .from("participants")
+      .insert({
+        raffle_id: raffleId,
+        user_id: user.id,
+        ticket_count: 1,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      // Handle race condition - record was created between check and insert
+      if (insertError.code === "23505") {
+        // Unique constraint violation - fetch existing
+        const { data: existing } = await supabase
+          .from("participants")
+          .select("*")
+          .eq("raffle_id", raffleId)
+          .eq("user_id", user.id)
+          .single();
+
+        if (existing) {
+          revalidatePath(`/participant/raffle/${raffleId}`);
+          return {
+            data: {
+              participant: existing,
+              isNewJoin: false,
+            },
+            error: null,
+          };
+        }
+      }
+
+      console.error("Failed to join raffle:", insertError);
+      return { data: null, error: "Failed to join raffle" };
+    }
+
+    revalidatePath(`/participant/raffle/${raffleId}`);
+    return {
+      data: {
+        participant: newParticipant,
+        isNewJoin: true,
+      },
+      error: null,
+    };
+  } catch (e) {
+    console.error("Unexpected error joining raffle:", e);
+    return { data: null, error: "Failed to join raffle" };
+  }
+}
+
+/**
+ * Get participant record for the current user in a specific raffle
+ *
+ * @param raffleId - UUID of the raffle
+ * @returns ActionResult with Participant or null if not joined
+ */
+export async function getParticipation(
+  raffleId: string
+): Promise<ActionResult<Participant | null>> {
+  try {
+    const parsed = JoinRaffleSchema.safeParse({ raffleId });
+    if (!parsed.success) {
+      return { data: null, error: "Invalid raffle ID" };
+    }
+
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { data: null, error: "Not authenticated" };
+    }
+
+    const { data: participant, error } = await supabase
+      .from("participants")
+      .select("*")
+      .eq("raffle_id", raffleId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (error) {
+      // No participant record found is not an error
+      if (error.code === "PGRST116") {
+        return { data: null, error: null };
+      }
+      console.error("Failed to get participation:", error);
+      return { data: null, error: "Failed to get participation" };
+    }
+
+    return { data: participant, error: null };
+  } catch (e) {
+    console.error("Unexpected error getting participation:", e);
+    return { data: null, error: "Failed to get participation" };
+  }
+}

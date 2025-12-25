@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,12 +12,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signUp } from "@/lib/actions/auth";
+import { Loader2 } from "lucide-react";
 
-export default function SignUpPage() {
+function SignUpForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirectTo");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -71,8 +75,9 @@ export default function SignUpPage() {
         return;
       }
 
-      // Redirect to participant dashboard on success (auto-login)
-      router.push("/participant");
+      // Redirect to original destination or participant dashboard (auto-login)
+      const destination = redirectTo || "/participant";
+      router.push(destination);
       router.refresh();
     } catch {
       setError("An unexpected error occurred. Please try again.");
@@ -158,7 +163,7 @@ export default function SignUpPage() {
                   Already have an account?{" "}
                 </span>
                 <Link
-                  href="/login"
+                  href={redirectTo ? `/login?redirectTo=${encodeURIComponent(redirectTo)}` : "/login"}
                   className="font-medium text-primary underline-offset-4 hover:underline"
                 >
                   Sign In
@@ -173,5 +178,27 @@ export default function SignUpPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function SignUpFallback() {
+  return (
+    <div className="flex min-h-screen w-full items-center justify-center p-6 md:p-10">
+      <div className="w-full max-w-sm">
+        <Card>
+          <CardContent className="pt-6 flex justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={<SignUpFallback />}>
+      <SignUpForm />
+    </Suspense>
   );
 }

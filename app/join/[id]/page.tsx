@@ -1,8 +1,11 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isExpired } from "@/lib/utils/dates";
+import { joinRaffle } from "@/lib/actions/tickets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 interface JoinPageProps {
   params: Promise<{ id: string }>;
@@ -11,11 +14,12 @@ interface JoinPageProps {
 /**
  * QR code join page for participants
  *
- * This page handles the initial scan of a raffle QR code.
- * - Validates the raffle exists and is active
- * - Checks if the QR code has expired
- * - Redirects to expired page if expired
- * - Full participant registration flow will be implemented in Story 3-1
+ * This page handles the complete join flow:
+ * 1. Validates the raffle exists and is active
+ * 2. Checks if the QR code has expired
+ * 3. Redirects unauthenticated users to login (preserving return URL)
+ * 4. Auto-registers authenticated users
+ * 5. Redirects to participant dashboard on success
  */
 export default async function JoinPage({ params }: JoinPageProps) {
   const { id } = await params;
@@ -27,9 +31,21 @@ export default async function JoinPage({ params }: JoinPageProps) {
     notFound();
   }
 
-  // Fetch raffle (public access - no auth required)
+  // Create Supabase client
   const supabase = await createClient();
 
+  // Check if user is authenticated (AC #2)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    // Redirect to login with return URL preserved
+    const returnUrl = `/join/${id}`;
+    redirect(`/login?redirectTo=${encodeURIComponent(returnUrl)}`);
+  }
+
+  // Fetch raffle
   const { data: raffle, error } = await supabase
     .from("raffles")
     .select("id, name, status, qr_code_expires_at")
@@ -47,30 +63,40 @@ export default async function JoinPage({ params }: JoinPageProps) {
     notFound();
   }
 
-  // Check if QR code has expired
+  // Check if QR code has expired (AC #5)
   if (raffle.qr_code_expires_at && isExpired(raffle.qr_code_expires_at)) {
     redirect(`/join/${id}/expired`);
   }
 
-  // For now, show a placeholder since full join flow is in Story 3-1
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="max-w-md w-full text-center">
-        <CardHeader>
-          <CardTitle className="text-2xl">{raffle.name}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-          <p className="text-muted-foreground">
-            Welcome! Participant registration will be available soon.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            The full join experience is coming in a future update.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  // Auto-register the participant (AC #3, #4)
+  const result = await joinRaffle(id);
+
+  if (result.error) {
+    // Handle error case - show error UI
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="max-w-md w-full text-center">
+          <CardHeader>
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
+              <AlertCircle className="h-8 w-8 text-destructive" />
+            </div>
+            <CardTitle className="text-2xl">Unable to Join</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">{result.error}</p>
+            <div className="pt-4">
+              <Button asChild>
+                <Link href={`/join/${id}`}>Try Again</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Success - redirect to participant dashboard (AC #3)
+  // Add isNew query param so dashboard can show appropriate toast
+  const isNew = result.data?.isNewJoin ? "true" : "false";
+  redirect(`/participant/raffle/${id}?joined=${isNew}`);
 }

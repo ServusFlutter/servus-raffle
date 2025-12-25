@@ -57,8 +57,8 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Participant Joining & Ticket System
-  epic-3: backlog
-  3-1-qr-code-join-flow-and-participant-registration: backlog
+  epic-3: in-progress
+  3-1-qr-code-join-flow-and-participant-registration: done
   3-2-ticket-display-with-ticketcircle-component: backlog
   3-3-ticket-accumulation-across-events: backlog
   3-4-ticket-confirmation-and-status-feedback: backlog

@@ -4,15 +4,18 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import LoginPage from "./page";
+import { Suspense } from "react";
 
-// Mock useRouter
+// Mock useRouter and useSearchParams
 const mockPush = jest.fn();
 const mockRefresh = jest.fn();
+const mockSearchParams = new URLSearchParams();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
     refresh: mockRefresh,
   }),
+  useSearchParams: () => mockSearchParams,
 }));
 
 // Mock signIn action
@@ -21,13 +24,19 @@ jest.mock("@/lib/actions/auth", () => ({
   signIn: (...args: unknown[]) => mockSignIn(...args),
 }));
 
+// Helper to render with Suspense
+function renderWithSuspense(ui: React.ReactElement) {
+  return render(<Suspense fallback={<div>Loading...</div>}>{ui}</Suspense>);
+}
+
 describe("LoginPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams.delete("redirectTo");
   });
 
   it("should render login page with email/password form", () => {
-    render(<LoginPage />);
+    renderWithSuspense(<LoginPage />);
 
     expect(screen.getByText("Welcome to Servus Raffle")).toBeInTheDocument();
     expect(
@@ -41,7 +50,7 @@ describe("LoginPage", () => {
   });
 
   it("should show error when email is empty", async () => {
-    render(<LoginPage />);
+    renderWithSuspense(<LoginPage />);
 
     const button = screen.getByRole("button", { name: "Sign In" });
     fireEvent.click(button);
@@ -54,7 +63,7 @@ describe("LoginPage", () => {
   });
 
   it("should show error when password is empty", async () => {
-    render(<LoginPage />);
+    renderWithSuspense(<LoginPage />);
 
     const emailInput = screen.getByLabelText("Email");
     fireEvent.change(emailInput, { target: { value: "test@example.com" } });
@@ -70,7 +79,7 @@ describe("LoginPage", () => {
   });
 
   it("should show error for invalid email format", async () => {
-    render(<LoginPage />);
+    renderWithSuspense(<LoginPage />);
 
     const emailInput = screen.getByLabelText("Email");
     const passwordInput = screen.getByLabelText("Password");
@@ -93,7 +102,7 @@ describe("LoginPage", () => {
   it("should call signIn and redirect on successful login", async () => {
     mockSignIn.mockResolvedValue({ data: { id: "user-123" }, error: null });
 
-    render(<LoginPage />);
+    renderWithSuspense(<LoginPage />);
 
     const emailInput = screen.getByLabelText("Email");
     const passwordInput = screen.getByLabelText("Password");
@@ -120,7 +129,7 @@ describe("LoginPage", () => {
       error: "Invalid email or password",
     });
 
-    render(<LoginPage />);
+    renderWithSuspense(<LoginPage />);
 
     const emailInput = screen.getByLabelText("Email");
     const passwordInput = screen.getByLabelText("Password");
@@ -143,7 +152,7 @@ describe("LoginPage", () => {
       () => new Promise((resolve) => setTimeout(resolve, 100))
     );
 
-    render(<LoginPage />);
+    renderWithSuspense(<LoginPage />);
 
     const emailInput = screen.getByLabelText("Email");
     const passwordInput = screen.getByLabelText("Password");
@@ -160,14 +169,14 @@ describe("LoginPage", () => {
   });
 
   it("should have link to sign up page", () => {
-    render(<LoginPage />);
+    renderWithSuspense(<LoginPage />);
 
     const signUpLink = screen.getByRole("link", { name: "Sign Up" });
     expect(signUpLink).toHaveAttribute("href", "/signup");
   });
 
   it("should render privacy notice", () => {
-    render(<LoginPage />);
+    renderWithSuspense(<LoginPage />);
 
     expect(
       screen.getByText(/By signing in, you agree to participate/i)
@@ -177,7 +186,7 @@ describe("LoginPage", () => {
   it("should handle unexpected errors gracefully", async () => {
     mockSignIn.mockRejectedValue(new Error("Network error"));
 
-    render(<LoginPage />);
+    renderWithSuspense(<LoginPage />);
 
     const emailInput = screen.getByLabelText("Email");
     const passwordInput = screen.getByLabelText("Password");
@@ -192,6 +201,40 @@ describe("LoginPage", () => {
       expect(
         screen.getByText("An unexpected error occurred. Please try again.")
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("redirectTo parameter handling", () => {
+    it("should redirect to specified URL after login", async () => {
+      mockSearchParams.set("redirectTo", "/join/123");
+      mockSignIn.mockResolvedValue({ data: { id: "user-123" }, error: null });
+
+      renderWithSuspense(<LoginPage />);
+
+      const emailInput = screen.getByLabelText("Email");
+      const passwordInput = screen.getByLabelText("Password");
+
+      fireEvent.change(emailInput, { target: { value: "test@example.com" } });
+      fireEvent.change(passwordInput, { target: { value: "password123" } });
+
+      const button = screen.getByRole("button", { name: "Sign In" });
+      fireEvent.click(button);
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith("/join/123");
+      });
+    });
+
+    it("should pass redirectTo to signup link", () => {
+      mockSearchParams.set("redirectTo", "/join/456");
+
+      renderWithSuspense(<LoginPage />);
+
+      const signUpLink = screen.getByRole("link", { name: "Sign Up" });
+      expect(signUpLink).toHaveAttribute(
+        "href",
+        "/signup?redirectTo=%2Fjoin%2F456"
+      );
     });
   });
 });

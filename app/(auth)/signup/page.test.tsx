@@ -4,15 +4,18 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import SignUpPage from "./page";
+import { Suspense } from "react";
 
-// Mock useRouter
+// Mock useRouter and useSearchParams
 const mockPush = jest.fn();
 const mockRefresh = jest.fn();
+const mockSearchParams = new URLSearchParams();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
     refresh: mockRefresh,
   }),
+  useSearchParams: () => mockSearchParams,
 }));
 
 // Mock signUp action
@@ -21,13 +24,19 @@ jest.mock("@/lib/actions/auth", () => ({
   signUp: (...args: unknown[]) => mockSignUp(...args),
 }));
 
+// Helper to render with Suspense
+function renderWithSuspense(ui: React.ReactElement) {
+  return render(<Suspense fallback={<div>Loading...</div>}>{ui}</Suspense>);
+}
+
 describe("SignUpPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams.delete("redirectTo");
   });
 
   it("should render signup page with registration form", () => {
-    render(<SignUpPage />);
+    renderWithSuspense(<SignUpPage />);
 
     expect(screen.getByText("Create an Account")).toBeInTheDocument();
     expect(
@@ -40,7 +49,7 @@ describe("SignUpPage", () => {
   });
 
   it("should show error when name is empty", async () => {
-    render(<SignUpPage />);
+    renderWithSuspense(<SignUpPage />);
 
     const button = screen.getByRole("button", { name: "Sign Up" });
     fireEvent.click(button);
@@ -53,7 +62,7 @@ describe("SignUpPage", () => {
   });
 
   it("should show error when email is empty", async () => {
-    render(<SignUpPage />);
+    renderWithSuspense(<SignUpPage />);
 
     const nameInput = screen.getByLabelText("Name");
     fireEvent.change(nameInput, { target: { value: "Test User" } });
@@ -69,7 +78,7 @@ describe("SignUpPage", () => {
   });
 
   it("should show error for invalid email format", async () => {
-    render(<SignUpPage />);
+    renderWithSuspense(<SignUpPage />);
 
     const nameInput = screen.getByLabelText("Name");
     const emailInput = screen.getByLabelText("Email");
@@ -92,7 +101,7 @@ describe("SignUpPage", () => {
   });
 
   it("should show error when password is too short", async () => {
-    render(<SignUpPage />);
+    renderWithSuspense(<SignUpPage />);
 
     const nameInput = screen.getByLabelText("Name");
     const emailInput = screen.getByLabelText("Email");
@@ -117,7 +126,7 @@ describe("SignUpPage", () => {
   it("should call signUp and redirect on successful registration", async () => {
     mockSignUp.mockResolvedValue({ data: { id: "user-123" }, error: null });
 
-    render(<SignUpPage />);
+    renderWithSuspense(<SignUpPage />);
 
     const nameInput = screen.getByLabelText("Name");
     const emailInput = screen.getByLabelText("Email");
@@ -150,7 +159,7 @@ describe("SignUpPage", () => {
       error: "An account with this email already exists",
     });
 
-    render(<SignUpPage />);
+    renderWithSuspense(<SignUpPage />);
 
     const nameInput = screen.getByLabelText("Name");
     const emailInput = screen.getByLabelText("Email");
@@ -177,7 +186,7 @@ describe("SignUpPage", () => {
       () => new Promise((resolve) => setTimeout(resolve, 100))
     );
 
-    render(<SignUpPage />);
+    renderWithSuspense(<SignUpPage />);
 
     const nameInput = screen.getByLabelText("Name");
     const emailInput = screen.getByLabelText("Email");
@@ -196,14 +205,14 @@ describe("SignUpPage", () => {
   });
 
   it("should have link to login page", () => {
-    render(<SignUpPage />);
+    renderWithSuspense(<SignUpPage />);
 
     const signInLink = screen.getByRole("link", { name: "Sign In" });
     expect(signInLink).toHaveAttribute("href", "/login");
   });
 
   it("should render password requirements hint", () => {
-    render(<SignUpPage />);
+    renderWithSuspense(<SignUpPage />);
 
     expect(
       screen.getByText("Must be at least 8 characters")
@@ -211,7 +220,7 @@ describe("SignUpPage", () => {
   });
 
   it("should render privacy notice", () => {
-    render(<SignUpPage />);
+    renderWithSuspense(<SignUpPage />);
 
     expect(
       screen.getByText(/By signing up, you agree to participate/i)
@@ -221,7 +230,7 @@ describe("SignUpPage", () => {
   it("should handle unexpected errors gracefully", async () => {
     mockSignUp.mockRejectedValue(new Error("Network error"));
 
-    render(<SignUpPage />);
+    renderWithSuspense(<SignUpPage />);
 
     const nameInput = screen.getByLabelText("Name");
     const emailInput = screen.getByLabelText("Email");
@@ -238,6 +247,42 @@ describe("SignUpPage", () => {
       expect(
         screen.getByText("An unexpected error occurred. Please try again.")
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("redirectTo parameter handling", () => {
+    it("should redirect to specified URL after signup", async () => {
+      mockSearchParams.set("redirectTo", "/join/123");
+      mockSignUp.mockResolvedValue({ data: { id: "user-123" }, error: null });
+
+      renderWithSuspense(<SignUpPage />);
+
+      const nameInput = screen.getByLabelText("Name");
+      const emailInput = screen.getByLabelText("Email");
+      const passwordInput = screen.getByLabelText("Password");
+
+      fireEvent.change(nameInput, { target: { value: "Test User" } });
+      fireEvent.change(emailInput, { target: { value: "test@example.com" } });
+      fireEvent.change(passwordInput, { target: { value: "password123" } });
+
+      const button = screen.getByRole("button", { name: "Sign Up" });
+      fireEvent.click(button);
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith("/join/123");
+      });
+    });
+
+    it("should pass redirectTo to login link", () => {
+      mockSearchParams.set("redirectTo", "/join/456");
+
+      renderWithSuspense(<SignUpPage />);
+
+      const signInLink = screen.getByRole("link", { name: "Sign In" });
+      expect(signInLink).toHaveAttribute(
+        "href",
+        "/login?redirectTo=%2Fjoin%2F456"
+      );
     });
   });
 });
