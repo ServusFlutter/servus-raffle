@@ -1,0 +1,89 @@
+# generated: 2025-12-25
+# project: servus-raffle
+# project_key: servus-raffle
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2025-12-25
+project: servus-raffle
+project_key: servus-raffle
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 1: Project Foundation & User Authentication
+  epic-1: backlog
+  1-1-initialize-project-with-starter-template: backlog
+  1-2-implement-meetup-oauth-authentication: backlog
+  1-3-display-user-profile-information: backlog
+  1-4-implement-user-logout: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: Raffle Creation & QR Codes
+  epic-2: backlog
+  2-1-admin-role-authorization: backlog
+  2-2-create-new-raffle: backlog
+  2-3-generate-qr-code-with-expiration: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: Participant Joining & Ticket System
+  epic-3: backlog
+  3-1-qr-code-join-flow-and-participant-registration: backlog
+  3-2-ticket-display-with-ticketcircle-component: backlog
+  3-3-ticket-accumulation-across-events: backlog
+  3-4-ticket-confirmation-and-status-feedback: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: Prize Management
+  epic-4: backlog
+  4-1-add-prizes-to-raffle: backlog
+  4-2-prize-ordering-for-sequential-drawing: backlog
+  4-3-track-prize-award-status: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: Admin Dashboard & Participant Visibility
+  epic-5: backlog
+  5-1-participant-list-and-statistics-dashboard: backlog
+  5-2-raffle-history-view: backlog
+  5-3-participant-prize-and-status-view: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6: Live Draw Experience
+  epic-6: backlog
+  6-1-admin-live-draw-mode-and-projection-ui: backlog
+  6-2-real-time-channel-setup-and-synchronization: backlog
+  6-3-draw-winner-server-action: backlog
+  6-4-wheel-of-fortune-animation: backlog
+  6-5-winner-celebration-and-announcement: backlog
+  6-6-ticket-reset-and-post-win-messaging: backlog
+  6-7-sequential-prize-drawing-flow: backlog
+  epic-6-retrospective: optional
