@@ -1,12 +1,21 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { TicketCircle, getTicketMessage } from "@/components/raffle/ticketCircle";
+import { StatusBar } from "@/components/raffle/statusBar";
+
+// Valid raffle statuses that the client can display
+type RaffleStatus = "active" | "drawing" | "completed";
+
+// Type guard to validate raffle status
+function isValidRaffleStatus(status: string): status is RaffleStatus {
+  return status === "active" || status === "drawing" || status === "completed";
+}
 
 interface ParticipantRaffleClientProps {
   raffleId: string;
@@ -35,12 +44,21 @@ export function ParticipantRaffleClient({
   const isMultiEventUser = ticketCount > perRaffleTicketCount;
   const router = useRouter();
 
-  // Show toast on first join (AC #3, #4)
+  // State for screen reader announcements (AC #5)
+  const [screenReaderAnnouncement, setScreenReaderAnnouncement] =
+    useState<string>("");
+
+  // Show toast on first join (AC #1, #3, #4)
   useEffect(() => {
     if (showJoinedToast === "true") {
+      // Set screen reader announcement (AC #5)
+      setScreenReaderAnnouncement(
+        `You now have ${ticketCount} ticket${ticketCount !== 1 ? "s" : ""} for the raffle`
+      );
+      // Toast with 3-second auto-dismiss (AC #1)
       toast.success("You're in! Good luck!", {
         description: "Your ticket has been registered for this raffle.",
-        duration: 5000,
+        duration: 3000,
       });
       // Remove the query param after showing toast
       router.replace(`/participant/raffle/${raffleId}`, { scroll: false });
@@ -51,7 +69,7 @@ export function ParticipantRaffleClient({
       });
       router.replace(`/participant/raffle/${raffleId}`, { scroll: false });
     }
-  }, [showJoinedToast, raffleId, router]);
+  }, [showJoinedToast, raffleId, router, ticketCount]);
 
   const getStatusBadge = () => {
     switch (raffleStatus) {
@@ -67,7 +85,23 @@ export function ParticipantRaffleClient({
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 pb-20">
+      {/*
+        Screen reader announcement for join events (AC #5)
+        This is separate from TicketCircle's aria-label because:
+        - This announces the JOIN action: "You NOW have X tickets" (event-based)
+        - TicketCircle announces current state: "You have X tickets" (status-based)
+        - The JOIN announcement only triggers once on join, not on subsequent visits
+      */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+        data-testid="screen-reader-announcement"
+      >
+        {screenReaderAnnouncement}
+      </div>
       <Card className="max-w-md w-full">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20">
@@ -127,6 +161,11 @@ export function ParticipantRaffleClient({
           </p>
         </CardContent>
       </Card>
+
+      {/* StatusBar - fixed at bottom, only visible for active raffles (AC #2, #3) */}
+      {isValidRaffleStatus(raffleStatus) && (
+        <StatusBar status={raffleStatus} />
+      )}
     </div>
   );
 }

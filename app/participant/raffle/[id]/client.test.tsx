@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { ParticipantRaffleClient } from "./client";
+import { toast } from "sonner";
 
 // Mock next/navigation
 const mockPush = jest.fn();
@@ -19,6 +20,8 @@ jest.mock("sonner", () => ({
     error: jest.fn(),
   },
 }));
+
+const mockToast = toast as jest.Mocked<typeof toast>;
 
 describe("ParticipantRaffleClient", () => {
   const defaultProps = {
@@ -46,17 +49,17 @@ describe("ParticipantRaffleClient", () => {
       render(<ParticipantRaffleClient {...defaultProps} />);
 
       // TicketCircle has status role for accessibility
-      const statusElement = screen.getByRole("status");
-      expect(statusElement).toBeInTheDocument();
-      expect(statusElement).toHaveAttribute("aria-label", "You have 3 tickets");
+      const ticketCircle = screen.getByTestId("ticket-circle");
+      expect(ticketCircle).toBeInTheDocument();
+      expect(ticketCircle).toHaveAttribute("aria-label", "You have 3 tickets");
     });
 
     it("renders TicketCircle for single ticket", () => {
       render(<ParticipantRaffleClient {...defaultProps} ticketCount={1} />);
 
       expect(screen.getByText("1")).toBeInTheDocument();
-      const statusElement = screen.getByRole("status");
-      expect(statusElement).toHaveAttribute("aria-label", "You have 1 ticket");
+      const ticketCircle = screen.getByTestId("ticket-circle");
+      expect(ticketCircle).toHaveAttribute("aria-label", "You have 1 ticket");
     });
 
     it("renders TicketCircle for zero tickets", () => {
@@ -207,9 +210,9 @@ describe("ParticipantRaffleClient", () => {
     it("TicketCircle has proper ARIA attributes", () => {
       render(<ParticipantRaffleClient {...defaultProps} />);
 
-      const statusElement = screen.getByRole("status");
-      expect(statusElement).toHaveAttribute("aria-live", "polite");
-      expect(statusElement).toHaveAttribute("aria-atomic", "true");
+      const ticketCircle = screen.getByTestId("ticket-circle");
+      expect(ticketCircle).toHaveAttribute("aria-live", "polite");
+      expect(ticketCircle).toHaveAttribute("aria-atomic", "true");
     });
 
     it("respects reduced motion preference", () => {
@@ -251,6 +254,152 @@ describe("ParticipantRaffleClient", () => {
       );
 
       expect(screen.getByText("Completed")).toBeInTheDocument();
+    });
+  });
+
+  describe("StatusBar Integration (Story 3.4 AC #2, #3)", () => {
+    it("renders StatusBar for active raffle", () => {
+      render(<ParticipantRaffleClient {...defaultProps} raffleStatus="active" />);
+
+      expect(screen.getByTestId("status-bar")).toBeInTheDocument();
+      expect(
+        screen.getByText("Locked in - waiting for draw")
+      ).toBeInTheDocument();
+    });
+
+    it("shows pulsing green dot in StatusBar", () => {
+      render(<ParticipantRaffleClient {...defaultProps} raffleStatus="active" />);
+
+      const dot = screen.getByTestId("status-dot");
+      expect(dot).toHaveClass("bg-green-500");
+      expect(dot).toHaveClass("animate-pulse");
+    });
+
+    it("does not render StatusBar for completed raffle", () => {
+      render(
+        <ParticipantRaffleClient {...defaultProps} raffleStatus="completed" />
+      );
+
+      expect(screen.queryByTestId("status-bar")).not.toBeInTheDocument();
+    });
+
+    it("does not render StatusBar for drawing raffle", () => {
+      render(
+        <ParticipantRaffleClient {...defaultProps} raffleStatus="drawing" />
+      );
+
+      expect(screen.queryByTestId("status-bar")).not.toBeInTheDocument();
+    });
+
+    it("has proper passive UX - no action buttons visible (AC #4)", () => {
+      render(<ParticipantRaffleClient {...defaultProps} raffleStatus="active" />);
+
+      // StatusBar is informational only, no buttons
+      const statusBar = screen.getByTestId("status-bar");
+      expect(statusBar.querySelector("button")).not.toBeInTheDocument();
+
+      // No action buttons in the card either
+      const buttons = screen.queryAllByRole("button");
+      expect(buttons).toHaveLength(0);
+    });
+  });
+
+  describe("Toast Timing (Story 3.4 AC #1)", () => {
+    it("shows success toast with 3-second duration on join", () => {
+      render(
+        <ParticipantRaffleClient {...defaultProps} showJoinedToast="true" />
+      );
+
+      expect(mockToast.success).toHaveBeenCalledWith(
+        "You're in! Good luck!",
+        expect.objectContaining({
+          duration: 3000,
+        })
+      );
+    });
+
+    it("shows info toast with 3-second duration for already registered", () => {
+      render(
+        <ParticipantRaffleClient {...defaultProps} showJoinedToast="false" />
+      );
+
+      expect(mockToast.info).toHaveBeenCalledWith(
+        "You're already registered!",
+        expect.objectContaining({
+          duration: 3000,
+        })
+      );
+    });
+  });
+
+  describe("Invalid Status Handling (Type Safety)", () => {
+    it("does not render StatusBar for invalid/unknown status", () => {
+      render(
+        <ParticipantRaffleClient {...defaultProps} raffleStatus="invalid-status" />
+      );
+
+      expect(screen.queryByTestId("status-bar")).not.toBeInTheDocument();
+    });
+
+    it("still renders the rest of the dashboard for unknown status", () => {
+      render(
+        <ParticipantRaffleClient {...defaultProps} raffleStatus="pending" />
+      );
+
+      // Core elements should still render
+      expect(screen.getByText("Flutter Munich Raffle")).toBeInTheDocument();
+      expect(screen.getByTestId("ticket-circle")).toBeInTheDocument();
+      // StatusBar should not render for invalid status
+      expect(screen.queryByTestId("status-bar")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Screen Reader ARIA Live Region (Story 3.4 AC #5)", () => {
+    it("has hidden ARIA live region for screen reader announcements", () => {
+      render(<ParticipantRaffleClient {...defaultProps} />);
+
+      const announcement = screen.getByTestId("screen-reader-announcement");
+      expect(announcement).toBeInTheDocument();
+      expect(announcement).toHaveAttribute("role", "status");
+      expect(announcement).toHaveAttribute("aria-live", "polite");
+      expect(announcement).toHaveClass("sr-only");
+    });
+
+    it("announces ticket count to screen readers on join", () => {
+      render(
+        <ParticipantRaffleClient
+          {...defaultProps}
+          ticketCount={3}
+          showJoinedToast="true"
+        />
+      );
+
+      const announcement = screen.getByTestId("screen-reader-announcement");
+      expect(announcement).toHaveTextContent(
+        "You now have 3 tickets for the raffle"
+      );
+    });
+
+    it("announces singular ticket correctly", () => {
+      render(
+        <ParticipantRaffleClient
+          {...defaultProps}
+          ticketCount={1}
+          showJoinedToast="true"
+        />
+      );
+
+      const announcement = screen.getByTestId("screen-reader-announcement");
+      expect(announcement).toHaveTextContent(
+        "You now have 1 ticket for the raffle"
+      );
+    });
+
+    it("does not announce on initial load without showJoinedToast", () => {
+      render(<ParticipantRaffleClient {...defaultProps} />);
+
+      const announcement = screen.getByTestId("screen-reader-announcement");
+      expect(announcement).toHaveTextContent("");
     });
   });
 });
