@@ -1,8 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Ticket, Clock, CheckCircle2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { ParticipantRaffleClient } from "./client";
 
 interface ParticipantRafflePageProps {

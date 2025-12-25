@@ -4,8 +4,9 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Ticket, Clock, CheckCircle2 } from "lucide-react";
+import { Clock, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { TicketCircle, getTicketMessage } from "@/components/raffle/ticketCircle";
 
 interface ParticipantRaffleClientProps {
   raffleId: string;
@@ -72,15 +73,12 @@ export function ParticipantRaffleClient({
           <div className="mt-2">{getStatusBadge()}</div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Ticket Count Display */}
-          <div className="flex flex-col items-center justify-center py-4 border rounded-lg bg-muted/50">
-            <div className="flex items-center gap-2 mb-2">
-              <Ticket className="h-6 w-6 text-primary" />
-              <span className="text-lg font-medium">Your Tickets</span>
-            </div>
-            <div className="text-5xl font-bold text-primary">{ticketCount}</div>
-            <p className="text-sm text-muted-foreground mt-2">
-              ticket{ticketCount !== 1 ? "s" : ""} in this raffle
+          {/* Ticket Count Display - Hero TicketCircle Component (AC #1, #6) */}
+          <div className="flex flex-col items-center justify-center py-4">
+            <TicketCircle count={ticketCount} size="default" />
+            {/* Contextual Messaging (AC #4, #5) */}
+            <p className="text-sm text-muted-foreground mt-4 font-medium">
+              {getTicketMessage(ticketCount)}
             </p>
           </div>
 
