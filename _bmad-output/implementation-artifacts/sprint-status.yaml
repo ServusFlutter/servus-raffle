@@ -43,9 +43,9 @@ development_status:
   # Epic 1: Project Foundation & User Authentication
   epic-1: in-progress
   1-1-initialize-project-with-starter-template: done
-  1-2-implement-meetup-oauth-authentication: backlog
-  1-3-display-user-profile-information: backlog
-  1-4-implement-user-logout: backlog
+  1-2-implement-meetup-oauth-authentication: done
+  1-3-display-user-profile-information: done
+  1-4-implement-user-logout: done
   epic-1-retrospective: optional
 
   # Epic 2: Raffle Creation & QR Codes
