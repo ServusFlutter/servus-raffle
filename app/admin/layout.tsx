@@ -32,6 +32,12 @@ async function AdminHeader() {
         >
           Raffles
         </Link>
+        <Link
+          href="/admin/history"
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
+          History
+        </Link>
       </nav>
       <div className="flex items-center gap-4">
         <Link
@@ -51,6 +57,7 @@ function HeaderSkeleton() {
     <div className="flex items-center justify-between w-full animate-pulse">
       <div className="flex items-center gap-6">
         <div className="h-6 w-32 bg-muted rounded" />
+        <div className="h-4 w-16 bg-muted rounded" />
         <div className="h-4 w-16 bg-muted rounded" />
       </div>
       <div className="flex items-center gap-4">

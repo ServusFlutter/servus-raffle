@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { History, PlusCircle } from "lucide-react";
 import type { Raffle } from "@/lib/schemas/raffle";
 import { formatDate, getStatusVariant } from "@/lib/utils/raffle";
 
@@ -124,6 +124,23 @@ export default async function AdminDashboard() {
             </CardHeader>
           </Card>
         </div>
+      </section>
+
+      {/* View History Link */}
+      <section className="mt-8">
+        <Link href="/admin/history">
+          <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
+            <CardHeader className="py-4">
+              <div className="flex items-center gap-3">
+                <History className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-lg">View Raffle History</CardTitle>
+              </div>
+              <CardDescription>
+                See past raffles, winners, and fairness statistics
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
       </section>
     </div>
   );
