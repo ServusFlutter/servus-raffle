@@ -62,7 +62,7 @@ development_status:
   3-2-ticket-display-with-ticketcircle-component: done
   3-3-ticket-accumulation-across-events: done
   3-4-ticket-confirmation-and-status-feedback: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   # Epic 4: Prize Management
   epic-4: backlog

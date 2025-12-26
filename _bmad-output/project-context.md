@@ -104,6 +104,33 @@ export const RAFFLE_EVENTS = {
 channel.send({ event: 'draw-start' })  // Should be DRAW_START
 ```
 
+### RLS Policies (Row-Level Security)
+
+- **ONE policy per operation per role** - Combine conditions with OR, not separate policies
+- **ALWAYS** wrap `auth.uid()` and `auth.role()` in `(SELECT ...)` for initplan optimization
+- **NEVER** create recursive policies (policy querying same table without SECURITY DEFINER function)
+- **AVOID** `USING (true)` - be explicit about access conditions
+
+```sql
+-- ✅ Correct - Single combined policy with initplan optimization
+CREATE POLICY "Users can read participants" ON participants
+  FOR SELECT
+  USING (
+    (SELECT auth.uid()) = user_id  -- own records
+    OR
+    is_participant_in_raffle(raffle_id)  -- raffle participants
+  );
+
+-- ❌ Wrong - Multiple separate policies (lint 0006)
+CREATE POLICY "Policy 1" ON table FOR SELECT USING (condition1);
+CREATE POLICY "Policy 2" ON table FOR SELECT USING (condition2);
+
+-- ❌ Wrong - No initplan optimization
+USING (auth.uid() = user_id)  -- Should be (SELECT auth.uid())
+```
+
+Reference: https://supabase.com/docs/guides/database/database-advisors
+
 ### Validation
 
 - **ALWAYS** use Zod for external data validation
@@ -259,6 +286,9 @@ describe('Feature Integration Tests', () => {
 - [ ] Integration tests for database operations
 - [ ] Both test suites pass: `npm run test` AND `npm run test:integration`
 - [ ] Security check passes: `npm run supabase:security` (0 issues)
+- [ ] **Supabase Dashboard Lint Check**: Open Supabase Dashboard → Database → Linting → Verify 0 issues
+  - Pay attention to: `0006_multiple_permissive_policies`, `0001_unindexed_foreign_keys`, `0002_auth_*`
+  - Reference: https://supabase.com/docs/guides/database/database-advisors
 
 ### Test Data (Known UUIDs)
 
@@ -307,6 +337,8 @@ toast.error("No participants to draw from")
 5. **NEVER** store secrets in NEXT_PUBLIC_* variables
 6. **NEVER** skip integration tests for database/RLS changes
 7. **NEVER** break the migrations symlink in `supabase-test/supabase/migrations`
+8. **NEVER** create multiple permissive RLS policies for same operation/role (lint 0006)
+9. **NEVER** skip Supabase Dashboard lint check before marking story complete
 
 ### Security Rules
 
