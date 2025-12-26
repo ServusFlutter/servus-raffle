@@ -4,8 +4,7 @@
 import "@testing-library/jest-dom";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PrizeList } from "./prizeList";
-import type { Prize } from "@/lib/schemas/prize";
+import { PrizeList, type PrizeWithWinner } from "./prizeList";
 
 describe("PrizeList", () => {
   const mockOnEdit = jest.fn();
@@ -14,14 +13,14 @@ describe("PrizeList", () => {
   const mockOnMoveDown = jest.fn();
 
   const defaultProps = {
-    prizes: [] as Prize[],
+    prizes: [] as PrizeWithWinner[],
     onEdit: mockOnEdit,
     onDelete: mockOnDelete,
     onMoveUp: mockOnMoveUp,
     onMoveDown: mockOnMoveDown,
   };
 
-  const mockPrizes: Prize[] = [
+  const mockPrizes: PrizeWithWinner[] = [
     {
       id: "prize-1",
       raffle_id: "raffle-1",
@@ -30,6 +29,7 @@ describe("PrizeList", () => {
       sort_order: 0,
       awarded_to: null,
       awarded_at: null,
+      winner_name: null,
     },
     {
       id: "prize-2",
@@ -39,6 +39,7 @@ describe("PrizeList", () => {
       sort_order: 1,
       awarded_to: null,
       awarded_at: null,
+      winner_name: null,
     },
     {
       id: "prize-3",
@@ -48,6 +49,7 @@ describe("PrizeList", () => {
       sort_order: 2,
       awarded_to: "user-123",
       awarded_at: "2024-12-25T10:00:00Z",
+      winner_name: "John Winner",
     },
   ];
 
@@ -116,8 +118,95 @@ describe("PrizeList", () => {
     it("shows awarded date for awarded prizes", () => {
       render(<PrizeList {...defaultProps} prizes={[mockPrizes[2]]} />);
 
-      expect(screen.getByText(/Awarded on/)).toBeInTheDocument();
-      expect(screen.getByText(/December 25, 2024/)).toBeInTheDocument();
+      expect(screen.getByText(/Awarded to/)).toBeInTheDocument();
+      expect(screen.getByTestId("award-timestamp")).toBeInTheDocument();
+    });
+
+    it("shows winner name for awarded prizes", () => {
+      render(<PrizeList {...defaultProps} prizes={[mockPrizes[2]]} />);
+
+      expect(screen.getByTestId("winner-name")).toHaveTextContent("John Winner");
+    });
+
+    it("shows Unknown when winner_name is null", () => {
+      const prizeWithNoWinnerName: PrizeWithWinner = {
+        ...mockPrizes[2],
+        winner_name: null,
+      };
+      render(<PrizeList {...defaultProps} prizes={[prizeWithNoWinnerName]} />);
+
+      expect(screen.getByTestId("winner-name")).toHaveTextContent("Unknown");
+    });
+  });
+
+  describe("visual distinction (AC3)", () => {
+    it("applies opacity to awarded prizes", () => {
+      const { container } = render(<PrizeList {...defaultProps} prizes={[mockPrizes[2]]} />);
+
+      // The Card with awarded prize should have opacity-60 class
+      const cardWithOpacity = container.querySelector('.opacity-60');
+      expect(cardWithOpacity).toBeInTheDocument();
+    });
+
+    it("highlights next prize to draw when highlightNextToDraw is true", () => {
+      render(
+        <PrizeList
+          {...defaultProps}
+          prizes={mockPrizes}
+          highlightNextToDraw={true}
+        />
+      );
+
+      expect(screen.getByTestId("next-to-draw-prize")).toBeInTheDocument();
+    });
+
+    it("does not highlight next prize when highlightNextToDraw is false", () => {
+      render(
+        <PrizeList
+          {...defaultProps}
+          prizes={mockPrizes}
+          highlightNextToDraw={false}
+        />
+      );
+
+      expect(screen.queryByTestId("next-to-draw-prize")).not.toBeInTheDocument();
+    });
+
+    it("highlights first unawarded prize as next to draw", () => {
+      const prizesWithFirstAwarded: PrizeWithWinner[] = [
+        { ...mockPrizes[0], awarded_to: "user-1", winner_name: "Winner 1" },
+        { ...mockPrizes[1] }, // This should be highlighted
+        { ...mockPrizes[2] },
+      ];
+
+      render(
+        <PrizeList
+          {...defaultProps}
+          prizes={prizesWithFirstAwarded}
+          highlightNextToDraw={true}
+        />
+      );
+
+      const nextToDraw = screen.getByTestId("next-to-draw-prize");
+      expect(nextToDraw).toContainElement(screen.getByText("Second Prize"));
+    });
+
+    it("does not highlight any prize when all are awarded", () => {
+      const allAwarded: PrizeWithWinner[] = mockPrizes.map((p) => ({
+        ...p,
+        awarded_to: "user-1",
+        winner_name: "Winner",
+      }));
+
+      render(
+        <PrizeList
+          {...defaultProps}
+          prizes={allAwarded}
+          highlightNextToDraw={true}
+        />
+      );
+
+      expect(screen.queryByTestId("next-to-draw-prize")).not.toBeInTheDocument();
     });
   });
 

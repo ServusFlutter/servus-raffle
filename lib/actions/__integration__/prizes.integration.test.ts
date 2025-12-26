@@ -740,6 +740,133 @@ describe('Prize Integration Tests', () => {
     })
   })
 
+  describe('getPrizesWithWinners', () => {
+    it('should return prizes with winner names when awarded', async () => {
+      // Create a prize
+      const { data: prize } = await adminClient
+        .from('prizes')
+        .insert({
+          raffle_id: testRaffleId,
+          name: 'Prize to Award',
+          sort_order: 0,
+        })
+        .select()
+        .single()
+
+      // Award the prize to the test user
+      const { error: awardError } = await adminClient
+        .from('prizes')
+        .update({
+          awarded_to: testUserId,
+          awarded_at: new Date().toISOString(),
+        })
+        .eq('id', prize!.id)
+
+      expect(awardError).toBeNull()
+
+      // Fetch with join to get winner name
+      const { data: prizesWithWinner, error } = await adminClient
+        .from('prizes')
+        .select(`
+          *,
+          winner:users!awarded_to (
+            name
+          )
+        `)
+        .eq('id', prize!.id)
+        .single()
+
+      expect(error).toBeNull()
+      expect(prizesWithWinner?.winner).toBeDefined()
+      expect(prizesWithWinner?.winner?.name).toBe('Test User')
+
+      // Clean up
+      await adminClient.from('prizes').delete().eq('id', prize!.id)
+    })
+
+    it('should return null winner for unawarded prizes', async () => {
+      // Create an unawarded prize
+      const { data: prize } = await adminClient
+        .from('prizes')
+        .insert({
+          raffle_id: testRaffleId,
+          name: 'Unawarded Prize',
+          sort_order: 0,
+        })
+        .select()
+        .single()
+
+      // Fetch with join
+      const { data: prizeWithWinner, error } = await adminClient
+        .from('prizes')
+        .select(`
+          *,
+          winner:users!awarded_to (
+            name
+          )
+        `)
+        .eq('id', prize!.id)
+        .single()
+
+      expect(error).toBeNull()
+      expect(prizeWithWinner?.winner).toBeNull()
+
+      // Clean up
+      await adminClient.from('prizes').delete().eq('id', prize!.id)
+    })
+
+    it('should return prizes ordered by sort_order with winner info', async () => {
+      // Create multiple prizes
+      const { data: prize1 } = await adminClient
+        .from('prizes')
+        .insert({
+          raffle_id: testRaffleId,
+          name: 'First',
+          sort_order: 0,
+        })
+        .select()
+        .single()
+
+      const { data: prize2 } = await adminClient
+        .from('prizes')
+        .insert({
+          raffle_id: testRaffleId,
+          name: 'Second',
+          sort_order: 1,
+          awarded_to: testUserId,
+          awarded_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      // Fetch all with winners
+      const { data: prizes, error } = await adminClient
+        .from('prizes')
+        .select(`
+          *,
+          winner:users!awarded_to (
+            name
+          )
+        `)
+        .eq('raffle_id', testRaffleId)
+        .order('sort_order')
+
+      expect(error).toBeNull()
+      expect(prizes?.length).toBeGreaterThanOrEqual(2)
+
+      // Find our test prizes
+      const testPrize1 = prizes?.find(p => p.id === prize1!.id)
+      const testPrize2 = prizes?.find(p => p.id === prize2!.id)
+
+      expect(testPrize1?.winner).toBeNull()
+      expect(testPrize2?.winner?.name).toBe('Test User')
+
+      // Clean up
+      await adminClient.from('prizes').delete().eq('id', prize1!.id)
+      await adminClient.from('prizes').delete().eq('id', prize2!.id)
+    })
+  })
+
   describe('Data Integrity', () => {
     it('should enforce foreign key constraint for raffle_id', async () => {
       const nonExistentRaffleId = '00000000-0000-0000-0000-000000000000'

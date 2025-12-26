@@ -8,6 +8,13 @@ import {
   UpdatePrizeSchema,
   type Prize,
 } from "@/lib/schemas/prize";
+
+/**
+ * Prize with winner information for display
+ */
+export type PrizeWithWinner = Prize & {
+  winner_name: string | null;
+};
 import { revalidatePath } from "next/cache";
 
 /**
@@ -237,6 +244,85 @@ export async function getPrizes(raffleId: string): Promise<ActionResult<Prize[]>
     return { data: data as Prize[], error: null };
   } catch (e) {
     console.error("Unexpected error fetching prizes:", e);
+    return { data: null, error: "Failed to fetch prizes" };
+  }
+}
+
+/**
+ * Get all prizes for a raffle with winner names
+ *
+ * Joins prizes with users table to include winner information.
+ * Used for displaying award status with winner details.
+ *
+ * @param raffleId - UUID of the raffle to get prizes for
+ * @returns ActionResult with array of prizes including winner names or error
+ *
+ * @example
+ * ```typescript
+ * const result = await getPrizesWithWinners("123e4567-...")
+ * if (result.data) {
+ *   // Each prize has winner_name field
+ *   result.data.forEach(prize => {
+ *     if (prize.awarded_to) {
+ *       console.log(`${prize.name} awarded to ${prize.winner_name}`)
+ *     }
+ *   })
+ * }
+ * ```
+ */
+export async function getPrizesWithWinners(
+  raffleId: string
+): Promise<ActionResult<PrizeWithWinner[]>> {
+  try {
+    // 1. Validate admin status
+    const adminUser = await getAdminUser();
+    if (!adminUser) {
+      return { data: null, error: "Unauthorized: Admin access required" };
+    }
+
+    // 2. Validate UUID format
+    if (!UUID_REGEX.test(raffleId)) {
+      return { data: null, error: "Invalid raffle ID" };
+    }
+
+    // 3. Fetch prizes with winner names using join
+    const serviceClient = createServiceRoleClient();
+
+    const { data, error } = await serviceClient
+      .from("prizes")
+      .select(`
+        *,
+        winner:users!awarded_to (
+          name
+        )
+      `)
+      .eq("raffle_id", raffleId)
+      .order("sort_order", { ascending: true });
+
+    if (error) {
+      console.error("Database error fetching prizes with winners:", error);
+      return { data: null, error: "Failed to fetch prizes" };
+    }
+
+    // 4. Transform to flatten winner name
+    const prizesWithWinners: PrizeWithWinner[] = (data || []).map((prize) => {
+      // Extract winner name from nested object
+      const winnerData = prize.winner as { name: string | null } | null;
+      return {
+        id: prize.id,
+        raffle_id: prize.raffle_id,
+        name: prize.name,
+        description: prize.description,
+        sort_order: prize.sort_order,
+        awarded_to: prize.awarded_to,
+        awarded_at: prize.awarded_at,
+        winner_name: winnerData?.name || null,
+      };
+    });
+
+    return { data: prizesWithWinners, error: null };
+  } catch (e) {
+    console.error("Unexpected error fetching prizes with winners:", e);
     return { data: null, error: "Failed to fetch prizes" };
   }
 }

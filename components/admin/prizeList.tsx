@@ -10,26 +10,38 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { Prize } from "@/lib/schemas/prize";
+import type { PrizeWithWinner } from "@/lib/actions/prizes";
+
+// Re-export the type for convenience
+export type { PrizeWithWinner };
 
 interface PrizeListProps {
   /** List of prizes to display */
-  prizes: Prize[];
+  prizes: PrizeWithWinner[];
   /** Callback when edit button is clicked */
-  onEdit: (prize: Prize) => void;
+  onEdit: (prize: PrizeWithWinner) => void;
   /** Callback when delete button is clicked */
-  onDelete: (prize: Prize) => void;
+  onDelete: (prize: PrizeWithWinner) => void;
   /** Callback when move up button is clicked */
-  onMoveUp?: (prize: Prize) => void;
+  onMoveUp?: (prize: PrizeWithWinner) => void;
   /** Callback when move down button is clicked */
-  onMoveDown?: (prize: Prize) => void;
+  onMoveDown?: (prize: PrizeWithWinner) => void;
   /** Whether any action is in progress */
   isLoading?: boolean;
+  /** Whether to highlight the next prize to be drawn */
+  highlightNextToDraw?: boolean;
 }
 
 /**
  * Displays a list of prizes for a raffle
  * Shows prize name, description, award status, and action buttons
+ *
+ * Visual states:
+ * - Awarded prizes: reduced opacity (grayed out)
+ * - Next prize to draw: highlighted with blue border (when highlightNextToDraw=true)
+ * - Winner name displayed for awarded prizes
  */
 export function PrizeList({
   prizes,
@@ -38,7 +50,11 @@ export function PrizeList({
   onMoveUp,
   onMoveDown,
   isLoading = false,
+  highlightNextToDraw = false,
 }: PrizeListProps) {
+  // Find the index of the first non-awarded prize (next to be drawn)
+  const nextToDrawIndex = prizes.findIndex((p) => !p.awarded_to);
+
   if (prizes.length === 0) {
     return (
       <Card>
@@ -56,8 +72,21 @@ export function PrizeList({
 
   return (
     <div className="space-y-4">
-      {prizes.map((prize, index) => (
-        <Card key={prize.id}>
+      {prizes.map((prize, index) => {
+        const isAwarded = !!prize.awarded_to;
+        const isNextToDraw = highlightNextToDraw && index === nextToDrawIndex;
+
+        return (
+        <Card
+          key={prize.id}
+          className={cn(
+            // Awarded prizes: reduced opacity (grayed out)
+            isAwarded && "opacity-60",
+            // Next prize to draw: highlighted border
+            isNextToDraw && "border-2 border-blue-500 shadow-md"
+          )}
+          data-testid={isNextToDraw ? "next-to-draw-prize" : undefined}
+        >
           <CardHeader className="pb-3">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
@@ -143,22 +172,34 @@ export function PrizeList({
               </div>
             </div>
           </CardHeader>
-          {prize.awarded_to && prize.awarded_at && (
+          {prize.awarded_to && (
             <CardContent className="pt-0">
-              <p className="text-sm text-muted-foreground">
-                Awarded on{" "}
-                {new Date(prize.awarded_at).toLocaleDateString(undefined, {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Trophy className="h-4 w-4 text-green-600" aria-hidden="true" />
+                <span>
+                  Awarded to{" "}
+                  <span className="font-medium" data-testid="winner-name">
+                    {prize.winner_name || "Unknown"}
+                  </span>
+                </span>
+                {prize.awarded_at && (
+                  <span className="text-xs" data-testid="award-timestamp">
+                    on{" "}
+                    {new Date(prize.awarded_at).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                )}
+              </div>
             </CardContent>
           )}
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -166,7 +207,7 @@ export function PrizeList({
 /**
  * Badge showing the award status of a prize
  */
-function PrizeStatusBadge({ prize }: { prize: Prize }) {
+function PrizeStatusBadge({ prize }: { prize: PrizeWithWinner }) {
   if (prize.awarded_to) {
     return (
       <Badge variant="default" className="bg-green-600 hover:bg-green-700">

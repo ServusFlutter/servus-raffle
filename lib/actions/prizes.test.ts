@@ -4,6 +4,7 @@
 import {
   createPrize,
   getPrizes,
+  getPrizesWithWinners,
   updatePrize,
   deletePrize,
   getPrizeCount,
@@ -348,6 +349,177 @@ describe("Prize Server Actions", () => {
         const result = await getPrizes(mockRaffleId);
 
         expect(result).toEqual({ data: [], error: null });
+      });
+    });
+  });
+
+  describe("getPrizesWithWinners", () => {
+    describe("authorization", () => {
+      it("returns error when user is not authenticated", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: null },
+          error: null,
+        });
+
+        const result = await getPrizesWithWinners(mockRaffleId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Unauthorized: Admin access required",
+        });
+      });
+
+      it("returns error when user is not an admin", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "user-1", email: "user@test.com" } },
+          error: null,
+        });
+        (isAdmin as jest.Mock).mockReturnValue(false);
+
+        const result = await getPrizesWithWinners(mockRaffleId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Unauthorized: Admin access required",
+        });
+      });
+    });
+
+    describe("validation", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "admin-1", email: "admin@test.com" } },
+          error: null,
+        });
+        (isAdmin as jest.Mock).mockReturnValue(true);
+      });
+
+      it("returns error for invalid UUID", async () => {
+        const result = await getPrizesWithWinners("invalid-uuid");
+
+        expect(result).toEqual({
+          data: null,
+          error: "Invalid raffle ID",
+        });
+      });
+    });
+
+    describe("successful fetch with winners", () => {
+      const mockPrizesWithWinner = [
+        {
+          id: "prize-1",
+          raffle_id: mockRaffleId,
+          name: "First Prize",
+          description: null,
+          sort_order: 0,
+          awarded_to: "user-winner-1",
+          awarded_at: "2024-12-25T10:00:00Z",
+          winner: { name: "John Winner" },
+        },
+        {
+          id: "prize-2",
+          raffle_id: mockRaffleId,
+          name: "Second Prize",
+          description: "A description",
+          sort_order: 1,
+          awarded_to: null,
+          awarded_at: null,
+          winner: null,
+        },
+      ];
+
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "admin-1", email: "admin@test.com" } },
+          error: null,
+        });
+        (isAdmin as jest.Mock).mockReturnValue(true);
+      });
+
+      it("returns list of prizes with winner names", async () => {
+        mockServiceClient.order.mockResolvedValue({
+          data: mockPrizesWithWinner,
+          error: null,
+        });
+
+        const result = await getPrizesWithWinners(mockRaffleId);
+
+        expect(result.error).toBeNull();
+        expect(result.data).toHaveLength(2);
+        expect(result.data![0].winner_name).toBe("John Winner");
+        expect(result.data![1].winner_name).toBeNull();
+      });
+
+      it("flattens winner object to winner_name field", async () => {
+        mockServiceClient.order.mockResolvedValue({
+          data: mockPrizesWithWinner,
+          error: null,
+        });
+
+        const result = await getPrizesWithWinners(mockRaffleId);
+
+        expect(result.data![0]).toEqual({
+          id: "prize-1",
+          raffle_id: mockRaffleId,
+          name: "First Prize",
+          description: null,
+          sort_order: 0,
+          awarded_to: "user-winner-1",
+          awarded_at: "2024-12-25T10:00:00Z",
+          winner_name: "John Winner",
+        });
+      });
+
+      it("returns empty array when no prizes exist", async () => {
+        mockServiceClient.order.mockResolvedValue({
+          data: [],
+          error: null,
+        });
+
+        const result = await getPrizesWithWinners(mockRaffleId);
+
+        expect(result).toEqual({ data: [], error: null });
+      });
+
+      it("handles prize with null winner name", async () => {
+        const prizeWithNullWinnerName = [
+          {
+            ...mockPrizesWithWinner[0],
+            winner: { name: null },
+          },
+        ];
+        mockServiceClient.order.mockResolvedValue({
+          data: prizeWithNullWinnerName,
+          error: null,
+        });
+
+        const result = await getPrizesWithWinners(mockRaffleId);
+
+        expect(result.data![0].winner_name).toBeNull();
+      });
+    });
+
+    describe("database error", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "admin-1", email: "admin@test.com" } },
+          error: null,
+        });
+        (isAdmin as jest.Mock).mockReturnValue(true);
+      });
+
+      it("returns error when database fails", async () => {
+        mockServiceClient.order.mockResolvedValue({
+          data: null,
+          error: { message: "Database error" },
+        });
+
+        const result = await getPrizesWithWinners(mockRaffleId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Failed to fetch prizes",
+        });
       });
     });
   });

@@ -10,15 +10,16 @@ import { PrizeForm } from "@/components/admin/prizeForm";
 import { PrizeList } from "@/components/admin/prizeList";
 import { DeleteConfirmDialog } from "@/components/admin/deleteConfirmDialog";
 import {
-  getPrizes,
+  getPrizesWithWinners,
   createPrize,
   updatePrize,
   deletePrize,
   movePrizeUp,
   movePrizeDown,
+  type PrizeWithWinner,
 } from "@/lib/actions/prizes";
 import { getRaffle } from "@/lib/actions/raffles";
-import type { Prize } from "@/lib/schemas/prize";
+import { PrizeStatusSummary } from "@/components/admin/prizeStatusSummary";
 import type { Raffle } from "@/lib/schemas/raffle";
 
 /**
@@ -30,14 +31,14 @@ export default function PrizesPage() {
   const raffleId = params.id;
 
   const [raffle, setRaffle] = useState<Raffle | null>(null);
-  const [prizes, setPrizes] = useState<Prize[]>([]);
+  const [prizes, setPrizes] = useState<PrizeWithWinner[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Dialog states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingPrize, setEditingPrize] = useState<Prize | null>(null);
-  const [deletingPrize, setDeletingPrize] = useState<Prize | null>(null);
+  const [editingPrize, setEditingPrize] = useState<PrizeWithWinner | null>(null);
+  const [deletingPrize, setDeletingPrize] = useState<PrizeWithWinner | null>(null);
 
   /**
    * Load raffle and prizes data
@@ -47,7 +48,7 @@ export default function PrizesPage() {
     try {
       const [raffleResult, prizesResult] = await Promise.all([
         getRaffle(raffleId),
-        getPrizes(raffleId),
+        getPrizesWithWinners(raffleId),
       ]);
 
       if (raffleResult.error || !raffleResult.data) {
@@ -150,21 +151,21 @@ export default function PrizesPage() {
   /**
    * Open edit dialog for a prize
    */
-  function handleEditClick(prize: Prize) {
+  function handleEditClick(prize: PrizeWithWinner) {
     setEditingPrize(prize);
   }
 
   /**
    * Open delete confirmation for a prize
    */
-  function handleDeleteClick(prize: Prize) {
+  function handleDeleteClick(prize: PrizeWithWinner) {
     setDeletingPrize(prize);
   }
 
   /**
    * Handle moving a prize up in the sort order
    */
-  async function handleMoveUp(prize: Prize) {
+  async function handleMoveUp(prize: PrizeWithWinner) {
     setIsSubmitting(true);
     try {
       const result = await movePrizeUp(prize.id);
@@ -175,7 +176,8 @@ export default function PrizesPage() {
       }
 
       if (result.data) {
-        setPrizes(result.data);
+        // Reload to get winner names (movePrizeUp returns basic Prize[])
+        await loadData();
         toast.success("Prize moved up");
       }
     } catch {
@@ -188,7 +190,7 @@ export default function PrizesPage() {
   /**
    * Handle moving a prize down in the sort order
    */
-  async function handleMoveDown(prize: Prize) {
+  async function handleMoveDown(prize: PrizeWithWinner) {
     setIsSubmitting(true);
     try {
       const result = await movePrizeDown(prize.id);
@@ -199,7 +201,8 @@ export default function PrizesPage() {
       }
 
       if (result.data) {
-        setPrizes(result.data);
+        // Reload to get winner names (movePrizeDown returns basic Prize[])
+        await loadData();
         toast.success("Prize moved down");
       }
     } catch {
@@ -270,6 +273,9 @@ export default function PrizesPage() {
         </Button>
       </div>
 
+      {/* Prize status summary */}
+      <PrizeStatusSummary prizes={prizes} />
+
       {/* Prize list */}
       <PrizeList
         prizes={prizes}
@@ -278,6 +284,7 @@ export default function PrizesPage() {
         onMoveUp={handleMoveUp}
         onMoveDown={handleMoveDown}
         isLoading={isSubmitting}
+        highlightNextToDraw={raffle.status === "active"}
       />
 
       {/* Add prize dialog */}
