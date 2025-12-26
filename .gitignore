@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Build
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+
+# Supabase
+.supabase/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Override global gitignore - track Claude Code config
+!.claude/
+!.claude/**
+!.mcp.json
