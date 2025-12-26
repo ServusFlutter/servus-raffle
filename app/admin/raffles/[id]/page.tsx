@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, QrCode, Clock, AlertCircle, Gift, Plus, Users, Ticket } from "lucide-react";
+import { ArrowLeft, QrCode, Clock, AlertCircle, Gift, Plus, Users, Ticket, Play } from "lucide-react";
 import { getRaffle } from "@/lib/actions/raffles";
 import { getPrizeCount } from "@/lib/actions/prizes";
 import { getRaffleStatistics } from "@/lib/actions/participants";
@@ -243,13 +243,56 @@ export default async function RaffleDetailPage({
         {/* Draw Controls Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Draw Controls</CardTitle>
-            <CardDescription>Start the prize drawing</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Play className="h-5 w-5" />
+              Live Draw
+            </CardTitle>
+            <CardDescription>Start the live raffle draw</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Draw controls will be available in a future update.
-            </p>
+          <CardContent className="space-y-4">
+            {/* Only show for active raffles with prizes (AC #1) */}
+            {raffle.status === "active" && prizeCount > 0 ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Enter projection mode to conduct the live draw.
+                  Best viewed on a large screen or projector.
+                </p>
+                <div className="mt-4">
+                  <Link href={`/admin/raffles/${raffle.id}/live`}>
+                    <Button className="w-full" data-testid="start-live-draw-button">
+                      <Play className="mr-2 h-4 w-4" />
+                      Start Live Draw
+                    </Button>
+                  </Link>
+                </div>
+              </>
+            ) : raffle.status === "active" && prizeCount === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Add prizes before starting the live draw.
+              </p>
+            ) : raffle.status === "draft" ? (
+              <p className="text-sm text-muted-foreground">
+                Activate the raffle and add prizes before starting the live draw.
+              </p>
+            ) : raffle.status === "drawing" ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Drawing is in progress. Return to the live draw view.
+                </p>
+                <div className="mt-4">
+                  <Link href={`/admin/raffles/${raffle.id}/live`}>
+                    <Button className="w-full" variant="secondary">
+                      <Play className="mr-2 h-4 w-4" />
+                      Continue Live Draw
+                    </Button>
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                This raffle has been completed.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
