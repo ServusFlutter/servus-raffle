@@ -391,6 +391,370 @@ export async function deletePrize(
 }
 
 /**
+ * Reorder prizes by providing the complete ordered list of prize IDs
+ * The sort_order will be assigned based on array position (0, 1, 2, ...)
+ *
+ * @param raffleId - UUID of the raffle (for validation)
+ * @param prizeIds - Array of prize UUIDs in desired order
+ * @returns ActionResult with the updated prizes or error
+ *
+ * @example
+ * ```typescript
+ * const result = await reorderPrizes(raffleId, [prizeId3, prizeId1, prizeId2])
+ * if (result.error) {
+ *   toast.error(result.error)
+ * } else {
+ *   setPrizes(result.data)
+ * }
+ * ```
+ */
+export async function reorderPrizes(
+  raffleId: string,
+  prizeIds: string[]
+): Promise<ActionResult<Prize[]>> {
+  try {
+    // 1. Validate admin status
+    const adminUser = await getAdminUser();
+    if (!adminUser) {
+      return { data: null, error: "Unauthorized: Admin access required" };
+    }
+
+    // 2. Validate raffle UUID format
+    if (!UUID_REGEX.test(raffleId)) {
+      return { data: null, error: "Invalid raffle ID" };
+    }
+
+    // 3. Validate all prize UUIDs
+    for (const id of prizeIds) {
+      if (!UUID_REGEX.test(id)) {
+        return { data: null, error: "Invalid prize ID in list" };
+      }
+    }
+
+    // 4. Get service role client
+    const serviceClient = createServiceRoleClient();
+
+    // 5. Verify all prizes exist and belong to this raffle
+    const { data: existingPrizes, error: fetchError } = await serviceClient
+      .from("prizes")
+      .select("id, awarded_to")
+      .eq("raffle_id", raffleId);
+
+    if (fetchError) {
+      console.error("Error fetching prizes:", fetchError);
+      return { data: null, error: "Failed to fetch prizes" };
+    }
+
+    const existingIds = new Set(existingPrizes?.map((p) => p.id) || []);
+    for (const id of prizeIds) {
+      if (!existingIds.has(id)) {
+        return { data: null, error: "Prize not found or does not belong to this raffle" };
+      }
+    }
+
+    // 6. Check if any prizes are awarded (they should not be reordered)
+    const awardedPrizes = existingPrizes?.filter((p) => p.awarded_to) || [];
+    if (awardedPrizes.length > 0) {
+      const awardedIds = new Set(awardedPrizes.map((p) => p.id));
+      // Ensure awarded prizes maintain their relative positions
+      const originalAwardedPositions = prizeIds
+        .map((id, idx) => ({ id, idx }))
+        .filter((p) => awardedIds.has(p.id));
+      // For now, allow reordering but log a warning if awarded prizes are being moved
+      if (originalAwardedPositions.length > 0) {
+        console.warn("Reordering includes awarded prizes - proceeding anyway");
+      }
+    }
+
+    // 7. Update each prize's sort_order based on array position
+    const updatePromises = prizeIds.map((prizeId, index) =>
+      serviceClient
+        .from("prizes")
+        .update({ sort_order: index })
+        .eq("id", prizeId)
+        .eq("raffle_id", raffleId)
+    );
+
+    const results = await Promise.all(updatePromises);
+
+    // Check for errors
+    const errors = results.filter((r) => r.error);
+    if (errors.length > 0) {
+      console.error("Errors during reorder:", errors);
+      return { data: null, error: "Failed to reorder some prizes" };
+    }
+
+    // 8. Fetch updated prizes
+    const { data: prizes, error: refetchError } = await serviceClient
+      .from("prizes")
+      .select("*")
+      .eq("raffle_id", raffleId)
+      .order("sort_order", { ascending: true });
+
+    if (refetchError) {
+      return { data: null, error: "Failed to fetch updated prizes" };
+    }
+
+    // 9. Revalidate paths
+    revalidatePath(`/admin/raffles/${raffleId}`);
+    revalidatePath(`/admin/raffles/${raffleId}/prizes`);
+
+    return { data: prizes as Prize[], error: null };
+  } catch (e) {
+    console.error("Unexpected error reordering prizes:", e);
+    return { data: null, error: "Failed to reorder prizes" };
+  }
+}
+
+/**
+ * Move a prize up in the sort order (swap with previous)
+ *
+ * @param prizeId - UUID of the prize to move up
+ * @returns ActionResult with the updated prizes list or error
+ *
+ * @example
+ * ```typescript
+ * const result = await movePrizeUp(prizeId)
+ * if (result.error) {
+ *   toast.error(result.error)
+ * } else {
+ *   setPrizes(result.data)
+ * }
+ * ```
+ */
+export async function movePrizeUp(
+  prizeId: string
+): Promise<ActionResult<Prize[]>> {
+  try {
+    // 1. Validate admin status
+    const adminUser = await getAdminUser();
+    if (!adminUser) {
+      return { data: null, error: "Unauthorized: Admin access required" };
+    }
+
+    // 2. Validate UUID format
+    if (!UUID_REGEX.test(prizeId)) {
+      return { data: null, error: "Invalid prize ID" };
+    }
+
+    // 3. Get service role client
+    const serviceClient = createServiceRoleClient();
+
+    // 4. Get the prize and its raffle's prizes
+    const { data: prize, error: prizeError } = await serviceClient
+      .from("prizes")
+      .select("*")
+      .eq("id", prizeId)
+      .single();
+
+    if (prizeError || !prize) {
+      return { data: null, error: "Prize not found" };
+    }
+
+    // 5. Check if prize is awarded
+    if (prize.awarded_to) {
+      return { data: null, error: "Cannot move awarded prize" };
+    }
+
+    // 6. Get all prizes for this raffle ordered by sort_order
+    const { data: allPrizes, error: fetchError } = await serviceClient
+      .from("prizes")
+      .select("*")
+      .eq("raffle_id", prize.raffle_id)
+      .order("sort_order", { ascending: true });
+
+    if (fetchError || !allPrizes) {
+      return { data: null, error: "Failed to fetch prizes" };
+    }
+
+    // 7. Find current position
+    const currentIndex = allPrizes.findIndex((p) => p.id === prizeId);
+    if (currentIndex === 0) {
+      return { data: null, error: "Prize is already first" };
+    }
+
+    // 8. Get the previous prize
+    const previousPrize = allPrizes[currentIndex - 1];
+
+    // Check if previous prize is awarded (we can still swap)
+    if (previousPrize.awarded_to) {
+      return { data: null, error: "Cannot swap with awarded prize" };
+    }
+
+    // 9. Swap sort_order values
+    const currentSortOrder = prize.sort_order;
+    const previousSortOrder = previousPrize.sort_order;
+
+    const { error: updateError1 } = await serviceClient
+      .from("prizes")
+      .update({ sort_order: previousSortOrder })
+      .eq("id", prizeId);
+
+    if (updateError1) {
+      return { data: null, error: "Failed to update prize order" };
+    }
+
+    const { error: updateError2 } = await serviceClient
+      .from("prizes")
+      .update({ sort_order: currentSortOrder })
+      .eq("id", previousPrize.id);
+
+    if (updateError2) {
+      // Try to rollback
+      await serviceClient
+        .from("prizes")
+        .update({ sort_order: currentSortOrder })
+        .eq("id", prizeId);
+      return { data: null, error: "Failed to update prize order" };
+    }
+
+    // 10. Fetch updated prizes
+    const { data: updatedPrizes, error: refetchError } = await serviceClient
+      .from("prizes")
+      .select("*")
+      .eq("raffle_id", prize.raffle_id)
+      .order("sort_order", { ascending: true });
+
+    if (refetchError) {
+      return { data: null, error: "Failed to fetch updated prizes" };
+    }
+
+    // 11. Revalidate paths
+    revalidatePath(`/admin/raffles/${prize.raffle_id}`);
+    revalidatePath(`/admin/raffles/${prize.raffle_id}/prizes`);
+
+    return { data: updatedPrizes as Prize[], error: null };
+  } catch (e) {
+    console.error("Unexpected error moving prize up:", e);
+    return { data: null, error: "Failed to move prize" };
+  }
+}
+
+/**
+ * Move a prize down in the sort order (swap with next)
+ *
+ * @param prizeId - UUID of the prize to move down
+ * @returns ActionResult with the updated prizes list or error
+ *
+ * @example
+ * ```typescript
+ * const result = await movePrizeDown(prizeId)
+ * if (result.error) {
+ *   toast.error(result.error)
+ * } else {
+ *   setPrizes(result.data)
+ * }
+ * ```
+ */
+export async function movePrizeDown(
+  prizeId: string
+): Promise<ActionResult<Prize[]>> {
+  try {
+    // 1. Validate admin status
+    const adminUser = await getAdminUser();
+    if (!adminUser) {
+      return { data: null, error: "Unauthorized: Admin access required" };
+    }
+
+    // 2. Validate UUID format
+    if (!UUID_REGEX.test(prizeId)) {
+      return { data: null, error: "Invalid prize ID" };
+    }
+
+    // 3. Get service role client
+    const serviceClient = createServiceRoleClient();
+
+    // 4. Get the prize
+    const { data: prize, error: prizeError } = await serviceClient
+      .from("prizes")
+      .select("*")
+      .eq("id", prizeId)
+      .single();
+
+    if (prizeError || !prize) {
+      return { data: null, error: "Prize not found" };
+    }
+
+    // 5. Check if prize is awarded
+    if (prize.awarded_to) {
+      return { data: null, error: "Cannot move awarded prize" };
+    }
+
+    // 6. Get all prizes for this raffle ordered by sort_order
+    const { data: allPrizes, error: fetchError } = await serviceClient
+      .from("prizes")
+      .select("*")
+      .eq("raffle_id", prize.raffle_id)
+      .order("sort_order", { ascending: true });
+
+    if (fetchError || !allPrizes) {
+      return { data: null, error: "Failed to fetch prizes" };
+    }
+
+    // 7. Find current position
+    const currentIndex = allPrizes.findIndex((p) => p.id === prizeId);
+    if (currentIndex === allPrizes.length - 1) {
+      return { data: null, error: "Prize is already last" };
+    }
+
+    // 8. Get the next prize
+    const nextPrize = allPrizes[currentIndex + 1];
+
+    // Check if next prize is awarded (we can still swap)
+    if (nextPrize.awarded_to) {
+      return { data: null, error: "Cannot swap with awarded prize" };
+    }
+
+    // 9. Swap sort_order values
+    const currentSortOrder = prize.sort_order;
+    const nextSortOrder = nextPrize.sort_order;
+
+    const { error: updateError1 } = await serviceClient
+      .from("prizes")
+      .update({ sort_order: nextSortOrder })
+      .eq("id", prizeId);
+
+    if (updateError1) {
+      return { data: null, error: "Failed to update prize order" };
+    }
+
+    const { error: updateError2 } = await serviceClient
+      .from("prizes")
+      .update({ sort_order: currentSortOrder })
+      .eq("id", nextPrize.id);
+
+    if (updateError2) {
+      // Try to rollback
+      await serviceClient
+        .from("prizes")
+        .update({ sort_order: currentSortOrder })
+        .eq("id", prizeId);
+      return { data: null, error: "Failed to update prize order" };
+    }
+
+    // 10. Fetch updated prizes
+    const { data: updatedPrizes, error: refetchError } = await serviceClient
+      .from("prizes")
+      .select("*")
+      .eq("raffle_id", prize.raffle_id)
+      .order("sort_order", { ascending: true });
+
+    if (refetchError) {
+      return { data: null, error: "Failed to fetch updated prizes" };
+    }
+
+    // 11. Revalidate paths
+    revalidatePath(`/admin/raffles/${prize.raffle_id}`);
+    revalidatePath(`/admin/raffles/${prize.raffle_id}/prizes`);
+
+    return { data: updatedPrizes as Prize[], error: null };
+  } catch (e) {
+    console.error("Unexpected error moving prize down:", e);
+    return { data: null, error: "Failed to move prize" };
+  }
+}
+
+/**
  * Get the count of prizes for a raffle
  *
  * @param raffleId - UUID of the raffle

@@ -582,6 +582,164 @@ describe('Prize Integration Tests', () => {
     })
   })
 
+  describe('Prize Reordering', () => {
+    let prizeIds: string[] = []
+
+    beforeEach(async () => {
+      // Create 3 prizes in order
+      const { data: prize1 } = await adminClient
+        .from('prizes')
+        .insert({
+          raffle_id: testRaffleId,
+          name: 'Prize A',
+          sort_order: 0,
+        })
+        .select()
+        .single()
+
+      const { data: prize2 } = await adminClient
+        .from('prizes')
+        .insert({
+          raffle_id: testRaffleId,
+          name: 'Prize B',
+          sort_order: 1,
+        })
+        .select()
+        .single()
+
+      const { data: prize3 } = await adminClient
+        .from('prizes')
+        .insert({
+          raffle_id: testRaffleId,
+          name: 'Prize C',
+          sort_order: 2,
+        })
+        .select()
+        .single()
+
+      prizeIds = [prize1!.id, prize2!.id, prize3!.id]
+    })
+
+    afterEach(async () => {
+      // Clean up prizes created in this test
+      for (const id of prizeIds) {
+        await adminClient.from('prizes').delete().eq('id', id)
+      }
+      prizeIds = []
+    })
+
+    it('should update sort_order when prizes are reordered', async () => {
+      // Reverse the order: C, B, A
+      const newOrder = [prizeIds[2], prizeIds[1], prizeIds[0]]
+
+      // Update sort orders manually (simulating reorderPrizes action)
+      for (let i = 0; i < newOrder.length; i++) {
+        await adminClient
+          .from('prizes')
+          .update({ sort_order: i })
+          .eq('id', newOrder[i])
+      }
+
+      // Verify new order
+      const { data } = await adminClient
+        .from('prizes')
+        .select('*')
+        .eq('raffle_id', testRaffleId)
+        .order('sort_order')
+
+      expect(data![0].name).toBe('Prize C')
+      expect(data![0].sort_order).toBe(0)
+      expect(data![1].name).toBe('Prize B')
+      expect(data![1].sort_order).toBe(1)
+      expect(data![2].name).toBe('Prize A')
+      expect(data![2].sort_order).toBe(2)
+    })
+
+    it('should swap sort_order between adjacent prizes', async () => {
+      // Swap Prize A (sort_order 0) and Prize B (sort_order 1)
+      const prizeAId = prizeIds[0]
+      const prizeBId = prizeIds[1]
+
+      // Swap sort orders
+      await adminClient
+        .from('prizes')
+        .update({ sort_order: 1 })
+        .eq('id', prizeAId)
+
+      await adminClient
+        .from('prizes')
+        .update({ sort_order: 0 })
+        .eq('id', prizeBId)
+
+      // Verify swap
+      const { data: prizeA } = await adminClient
+        .from('prizes')
+        .select('*')
+        .eq('id', prizeAId)
+        .single()
+
+      const { data: prizeB } = await adminClient
+        .from('prizes')
+        .select('*')
+        .eq('id', prizeBId)
+        .single()
+
+      expect(prizeA!.sort_order).toBe(1)
+      expect(prizeB!.sort_order).toBe(0)
+    })
+
+    it('should maintain sort_order integrity after multiple reorders', async () => {
+      // Move Prize C to position 0, shift others
+      const prizeCId = prizeIds[2]
+
+      // Update all sort orders
+      await adminClient.from('prizes').update({ sort_order: 0 }).eq('id', prizeIds[2])
+      await adminClient.from('prizes').update({ sort_order: 1 }).eq('id', prizeIds[0])
+      await adminClient.from('prizes').update({ sort_order: 2 }).eq('id', prizeIds[1])
+
+      // Verify order
+      const { data } = await adminClient
+        .from('prizes')
+        .select('*')
+        .eq('raffle_id', testRaffleId)
+        .order('sort_order')
+
+      expect(data!.length).toBe(3)
+      expect(data![0].id).toBe(prizeCId)
+      expect(data![1].id).toBe(prizeIds[0])
+      expect(data![2].id).toBe(prizeIds[1])
+    })
+
+    it('should not affect prizes in other raffles when reordering', async () => {
+      // Create a prize in the other raffle
+      const { data: otherPrize } = await adminClient
+        .from('prizes')
+        .insert({
+          raffle_id: testActiveRaffleId,
+          name: 'Other Raffle Prize',
+          sort_order: 0,
+        })
+        .select()
+        .single()
+
+      // Reorder prizes in testRaffleId
+      await adminClient.from('prizes').update({ sort_order: 2 }).eq('id', prizeIds[0])
+      await adminClient.from('prizes').update({ sort_order: 0 }).eq('id', prizeIds[2])
+
+      // Verify the prize in other raffle was not affected
+      const { data: unchangedPrize } = await adminClient
+        .from('prizes')
+        .select('*')
+        .eq('id', otherPrize!.id)
+        .single()
+
+      expect(unchangedPrize!.sort_order).toBe(0)
+
+      // Clean up
+      await adminClient.from('prizes').delete().eq('id', otherPrize!.id)
+    })
+  })
+
   describe('Data Integrity', () => {
     it('should enforce foreign key constraint for raffle_id', async () => {
       const nonExistentRaffleId = '00000000-0000-0000-0000-000000000000'

@@ -10,11 +10,15 @@ import type { Prize } from "@/lib/schemas/prize";
 describe("PrizeList", () => {
   const mockOnEdit = jest.fn();
   const mockOnDelete = jest.fn();
+  const mockOnMoveUp = jest.fn();
+  const mockOnMoveDown = jest.fn();
 
   const defaultProps = {
     prizes: [] as Prize[],
     onEdit: mockOnEdit,
     onDelete: mockOnDelete,
+    onMoveUp: mockOnMoveUp,
+    onMoveDown: mockOnMoveDown,
   };
 
   const mockPrizes: Prize[] = [
@@ -49,6 +53,8 @@ describe("PrizeList", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockOnMoveUp.mockClear();
+    mockOnMoveDown.mockClear();
   });
 
   describe("empty state", () => {
@@ -241,6 +247,113 @@ describe("PrizeList", () => {
       expect(prizeNumbers[0]).toHaveTextContent("#1");
       expect(prizeNumbers[1]).toHaveTextContent("#2");
       expect(prizeNumbers[2]).toHaveTextContent("#3");
+    });
+  });
+
+  describe("move up/down buttons", () => {
+    it("renders move up and move down buttons when handlers are provided", () => {
+      render(<PrizeList {...defaultProps} prizes={[mockPrizes[1]]} />);
+
+      expect(
+        screen.getByRole("button", { name: /move second prize up/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /move second prize down/i })
+      ).toBeInTheDocument();
+    });
+
+    it("does not render move buttons when handlers are not provided", () => {
+      render(
+        <PrizeList
+          prizes={[mockPrizes[1]]}
+          onEdit={mockOnEdit}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      expect(
+        screen.queryByRole("button", { name: /move second prize up/i })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /move second prize down/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it("disables move up button for first prize", () => {
+      render(<PrizeList {...defaultProps} prizes={mockPrizes} />);
+
+      const moveUpButton = screen.getByRole("button", { name: /move first prize up/i });
+      expect(moveUpButton).toBeDisabled();
+    });
+
+    it("disables move down button for last prize", () => {
+      render(<PrizeList {...defaultProps} prizes={mockPrizes} />);
+
+      const moveDownButton = screen.getByRole("button", { name: /move third prize down/i });
+      expect(moveDownButton).toBeDisabled();
+    });
+
+    it("enables move buttons for middle prize", () => {
+      render(<PrizeList {...defaultProps} prizes={mockPrizes} />);
+
+      const moveUpButton = screen.getByRole("button", { name: /move second prize up/i });
+      const moveDownButton = screen.getByRole("button", { name: /move second prize down/i });
+
+      expect(moveUpButton).not.toBeDisabled();
+      expect(moveDownButton).not.toBeDisabled();
+    });
+
+    it("disables move buttons for awarded prizes", () => {
+      render(<PrizeList {...defaultProps} prizes={[mockPrizes[2]]} />);
+
+      const moveUpButton = screen.getByRole("button", { name: /move third prize up/i });
+      const moveDownButton = screen.getByRole("button", { name: /move third prize down/i });
+
+      expect(moveUpButton).toBeDisabled();
+      expect(moveDownButton).toBeDisabled();
+    });
+
+    it("calls onMoveUp when move up button is clicked", async () => {
+      const user = userEvent.setup();
+      render(<PrizeList {...defaultProps} prizes={mockPrizes} />);
+
+      const moveUpButton = screen.getByRole("button", { name: /move second prize up/i });
+      await user.click(moveUpButton);
+
+      expect(mockOnMoveUp).toHaveBeenCalledWith(mockPrizes[1]);
+    });
+
+    it("calls onMoveDown when move down button is clicked", async () => {
+      const user = userEvent.setup();
+      render(<PrizeList {...defaultProps} prizes={mockPrizes} />);
+
+      const moveDownButton = screen.getByRole("button", { name: /move second prize down/i });
+      await user.click(moveDownButton);
+
+      expect(mockOnMoveDown).toHaveBeenCalledWith(mockPrizes[1]);
+    });
+
+    it("disables move buttons when loading", () => {
+      render(
+        <PrizeList {...defaultProps} prizes={mockPrizes} isLoading={true} />
+      );
+
+      // Second prize move buttons (not at boundary, not awarded)
+      const moveUpButton = screen.getByRole("button", { name: /move second prize up/i });
+      const moveDownButton = screen.getByRole("button", { name: /move second prize down/i });
+
+      expect(moveUpButton).toBeDisabled();
+      expect(moveDownButton).toBeDisabled();
+    });
+
+    it("has correct title for disabled move buttons", () => {
+      render(<PrizeList {...defaultProps} prizes={mockPrizes} />);
+
+      const moveUpFirst = screen.getByRole("button", { name: /move first prize up/i });
+      expect(moveUpFirst).toHaveAttribute("title", "Already first");
+
+      const moveDownLast = screen.getByRole("button", { name: /move third prize down/i });
+      expect(moveDownLast).toHaveAttribute("title", "Cannot move awarded prize");
     });
   });
 });

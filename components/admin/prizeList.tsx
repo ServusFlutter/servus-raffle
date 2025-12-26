@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Trash2, Trophy, Clock } from "lucide-react";
+import { Pencil, Trash2, Trophy, Clock, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,6 +19,10 @@ interface PrizeListProps {
   onEdit: (prize: Prize) => void;
   /** Callback when delete button is clicked */
   onDelete: (prize: Prize) => void;
+  /** Callback when move up button is clicked */
+  onMoveUp?: (prize: Prize) => void;
+  /** Callback when move down button is clicked */
+  onMoveDown?: (prize: Prize) => void;
   /** Whether any action is in progress */
   isLoading?: boolean;
 }
@@ -31,6 +35,8 @@ export function PrizeList({
   prizes,
   onEdit,
   onDelete,
+  onMoveUp,
+  onMoveDown,
   isLoading = false,
 }: PrizeListProps) {
   if (prizes.length === 0) {
@@ -68,7 +74,43 @@ export function PrizeList({
                   </CardDescription>
                 )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
+                {onMoveUp && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onMoveUp(prize)}
+                    disabled={isLoading || index === 0 || !!prize.awarded_to}
+                    aria-label={`Move ${prize.name} up`}
+                    title={
+                      prize.awarded_to
+                        ? "Cannot move awarded prize"
+                        : index === 0
+                          ? "Already first"
+                          : `Move ${prize.name} up`
+                    }
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                )}
+                {onMoveDown && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onMoveDown(prize)}
+                    disabled={isLoading || index === prizes.length - 1 || !!prize.awarded_to}
+                    aria-label={`Move ${prize.name} down`}
+                    title={
+                      prize.awarded_to
+                        ? "Cannot move awarded prize"
+                        : index === prizes.length - 1
+                          ? "Already last"
+                          : `Move ${prize.name} down`
+                    }
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="icon"

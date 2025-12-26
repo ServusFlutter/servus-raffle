@@ -7,6 +7,9 @@ import {
   updatePrize,
   deletePrize,
   getPrizeCount,
+  reorderPrizes,
+  movePrizeUp,
+  movePrizeDown,
 } from "./prizes";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
@@ -623,6 +626,363 @@ describe("Prize Server Actions", () => {
         const result = await getPrizeCount(mockRaffleId);
 
         expect(result).toEqual({ data: 0, error: null });
+      });
+    });
+  });
+
+  describe("reorderPrizes", () => {
+    describe("authorization", () => {
+      it("returns error when user is not authenticated", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: null },
+          error: null,
+        });
+
+        const result = await reorderPrizes(mockRaffleId, ["prize-1", "prize-2"]);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Unauthorized: Admin access required",
+        });
+      });
+
+      it("returns error when user is not an admin", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "user-1", email: "user@test.com" } },
+          error: null,
+        });
+        (isAdmin as jest.Mock).mockReturnValue(false);
+
+        const result = await reorderPrizes(mockRaffleId, ["prize-1", "prize-2"]);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Unauthorized: Admin access required",
+        });
+      });
+    });
+
+    describe("validation", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "admin-1", email: "admin@test.com" } },
+          error: null,
+        });
+        (isAdmin as jest.Mock).mockReturnValue(true);
+      });
+
+      it("returns error for invalid raffle UUID", async () => {
+        const result = await reorderPrizes("invalid-uuid", ["prize-1"]);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Invalid raffle ID",
+        });
+      });
+
+      it("returns error for invalid prize UUID in list", async () => {
+        const result = await reorderPrizes(mockRaffleId, ["invalid-uuid"]);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Invalid prize ID in list",
+        });
+      });
+    });
+
+    describe("prize not found", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "admin-1", email: "admin@test.com" } },
+          error: null,
+        });
+        (isAdmin as jest.Mock).mockReturnValue(true);
+      });
+
+      it("returns error when prize does not belong to raffle", async () => {
+        const validPrizeId = "123e4567-e89b-12d3-a456-426614174001";
+        const unknownPrizeId = "123e4567-e89b-12d3-a456-426614174009";
+
+        // Mock fetch existing prizes - only returns one prize
+        mockServiceClient.eq.mockResolvedValueOnce({
+          data: [{ id: validPrizeId, awarded_to: null }],
+          error: null,
+        });
+
+        const result = await reorderPrizes(mockRaffleId, [validPrizeId, unknownPrizeId]);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Prize not found or does not belong to this raffle",
+        });
+      });
+    });
+  });
+
+  describe("movePrizeUp", () => {
+    const mockPrize = {
+      id: mockPrizeId,
+      raffle_id: mockRaffleId,
+      name: "Test Prize",
+      sort_order: 1,
+      awarded_to: null,
+      awarded_at: null,
+    };
+
+    const mockPreviousPrize = {
+      id: "prize-prev",
+      raffle_id: mockRaffleId,
+      name: "Previous Prize",
+      sort_order: 0,
+      awarded_to: null,
+      awarded_at: null,
+    };
+
+    describe("authorization", () => {
+      it("returns error when user is not authenticated", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: null },
+          error: null,
+        });
+
+        const result = await movePrizeUp(mockPrizeId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Unauthorized: Admin access required",
+        });
+      });
+    });
+
+    describe("validation", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "admin-1", email: "admin@test.com" } },
+          error: null,
+        });
+        (isAdmin as jest.Mock).mockReturnValue(true);
+      });
+
+      it("returns error for invalid UUID", async () => {
+        const result = await movePrizeUp("invalid-uuid");
+
+        expect(result).toEqual({
+          data: null,
+          error: "Invalid prize ID",
+        });
+      });
+
+      it("returns error when prize not found", async () => {
+        mockServiceClient.single.mockResolvedValue({
+          data: null,
+          error: { code: "PGRST116", message: "Not found" },
+        });
+
+        const result = await movePrizeUp(mockPrizeId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Prize not found",
+        });
+      });
+
+      it("returns error when prize is awarded", async () => {
+        mockServiceClient.single.mockResolvedValue({
+          data: { ...mockPrize, awarded_to: "user-123" },
+          error: null,
+        });
+
+        const result = await movePrizeUp(mockPrizeId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Cannot move awarded prize",
+        });
+      });
+
+      it("returns error when prize is already first", async () => {
+        mockServiceClient.single.mockResolvedValue({
+          data: { ...mockPrize, sort_order: 0 },
+          error: null,
+        });
+        mockServiceClient.order.mockResolvedValue({
+          data: [{ ...mockPrize, sort_order: 0 }],
+          error: null,
+        });
+
+        const result = await movePrizeUp(mockPrizeId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Prize is already first",
+        });
+      });
+    });
+
+    describe("cannot swap with awarded prize", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "admin-1", email: "admin@test.com" } },
+          error: null,
+        });
+        (isAdmin as jest.Mock).mockReturnValue(true);
+      });
+
+      it("returns error when previous prize is awarded", async () => {
+        const awardedPreviousPrize = {
+          ...mockPreviousPrize,
+          awarded_to: "winner-123",
+        };
+
+        mockServiceClient.single.mockResolvedValueOnce({
+          data: mockPrize,
+          error: null,
+        });
+        mockServiceClient.order.mockResolvedValueOnce({
+          data: [awardedPreviousPrize, mockPrize],
+          error: null,
+        });
+
+        const result = await movePrizeUp(mockPrizeId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Cannot swap with awarded prize",
+        });
+      });
+    });
+  });
+
+  describe("movePrizeDown", () => {
+    const mockPrize = {
+      id: mockPrizeId,
+      raffle_id: mockRaffleId,
+      name: "Test Prize",
+      sort_order: 0,
+      awarded_to: null,
+      awarded_at: null,
+    };
+
+    const mockNextPrize = {
+      id: "prize-next",
+      raffle_id: mockRaffleId,
+      name: "Next Prize",
+      sort_order: 1,
+      awarded_to: null,
+      awarded_at: null,
+    };
+
+    describe("authorization", () => {
+      it("returns error when user is not authenticated", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: null },
+          error: null,
+        });
+
+        const result = await movePrizeDown(mockPrizeId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Unauthorized: Admin access required",
+        });
+      });
+    });
+
+    describe("validation", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "admin-1", email: "admin@test.com" } },
+          error: null,
+        });
+        (isAdmin as jest.Mock).mockReturnValue(true);
+      });
+
+      it("returns error for invalid UUID", async () => {
+        const result = await movePrizeDown("invalid-uuid");
+
+        expect(result).toEqual({
+          data: null,
+          error: "Invalid prize ID",
+        });
+      });
+
+      it("returns error when prize not found", async () => {
+        mockServiceClient.single.mockResolvedValue({
+          data: null,
+          error: { code: "PGRST116", message: "Not found" },
+        });
+
+        const result = await movePrizeDown(mockPrizeId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Prize not found",
+        });
+      });
+
+      it("returns error when prize is awarded", async () => {
+        mockServiceClient.single.mockResolvedValue({
+          data: { ...mockPrize, awarded_to: "user-123" },
+          error: null,
+        });
+
+        const result = await movePrizeDown(mockPrizeId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Cannot move awarded prize",
+        });
+      });
+
+      it("returns error when prize is already last", async () => {
+        mockServiceClient.single.mockResolvedValue({
+          data: mockPrize,
+          error: null,
+        });
+        mockServiceClient.order.mockResolvedValue({
+          data: [mockPrize],
+          error: null,
+        });
+
+        const result = await movePrizeDown(mockPrizeId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Prize is already last",
+        });
+      });
+    });
+
+    describe("cannot swap with awarded prize", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "admin-1", email: "admin@test.com" } },
+          error: null,
+        });
+        (isAdmin as jest.Mock).mockReturnValue(true);
+      });
+
+      it("returns error when next prize is awarded", async () => {
+        const awardedNextPrize = {
+          ...mockNextPrize,
+          awarded_to: "winner-123",
+        };
+
+        mockServiceClient.single.mockResolvedValueOnce({
+          data: mockPrize,
+          error: null,
+        });
+        mockServiceClient.order.mockResolvedValueOnce({
+          data: [mockPrize, awardedNextPrize],
+          error: null,
+        });
+
+        const result = await movePrizeDown(mockPrizeId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Cannot swap with awarded prize",
+        });
       });
     });
   });

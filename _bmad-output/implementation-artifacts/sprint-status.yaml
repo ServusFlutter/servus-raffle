@@ -67,7 +67,7 @@ development_status:
   # Epic 4: Prize Management
   epic-4: in-progress
   4-1-add-prizes-to-raffle: done
-  4-2-prize-ordering-for-sequential-drawing: backlog
+  4-2-prize-ordering-for-sequential-drawing: done
   4-3-track-prize-award-status: backlog
   epic-4-retrospective: optional
 

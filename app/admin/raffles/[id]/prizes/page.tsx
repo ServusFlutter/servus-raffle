@@ -14,6 +14,8 @@ import {
   createPrize,
   updatePrize,
   deletePrize,
+  movePrizeUp,
+  movePrizeDown,
 } from "@/lib/actions/prizes";
 import { getRaffle } from "@/lib/actions/raffles";
 import type { Prize } from "@/lib/schemas/prize";
@@ -159,6 +161,54 @@ export default function PrizesPage() {
     setDeletingPrize(prize);
   }
 
+  /**
+   * Handle moving a prize up in the sort order
+   */
+  async function handleMoveUp(prize: Prize) {
+    setIsSubmitting(true);
+    try {
+      const result = await movePrizeUp(prize.id);
+
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      if (result.data) {
+        setPrizes(result.data);
+        toast.success("Prize moved up");
+      }
+    } catch {
+      toast.error("Failed to move prize");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  /**
+   * Handle moving a prize down in the sort order
+   */
+  async function handleMoveDown(prize: Prize) {
+    setIsSubmitting(true);
+    try {
+      const result = await movePrizeDown(prize.id);
+
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      if (result.data) {
+        setPrizes(result.data);
+        toast.success("Prize moved down");
+      }
+    } catch {
+      toast.error("Failed to move prize");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="container mx-auto max-w-4xl">
@@ -225,6 +275,8 @@ export default function PrizesPage() {
         prizes={prizes}
         onEdit={handleEditClick}
         onDelete={handleDeleteClick}
+        onMoveUp={handleMoveUp}
+        onMoveDown={handleMoveDown}
         isLoading={isSubmitting}
       />
 
