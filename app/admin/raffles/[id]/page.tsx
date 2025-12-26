@@ -101,12 +101,14 @@ export default async function RaffleDetailPage({
                   Set an expiration time and generate a QR code to allow
                   participants to join this raffle.
                 </p>
-                <Link href={`/admin/raffles/${raffle.id}/qr`}>
-                  <Button className="w-full">
-                    <QrCode className="mr-2 h-4 w-4" />
-                    Generate QR Code
-                  </Button>
-                </Link>
+                <div className="mt-4">
+                  <Link href={`/admin/raffles/${raffle.id}/qr`}>
+                    <Button className="w-full">
+                      <QrCode className="mr-2 h-4 w-4" />
+                      Generate QR Code
+                    </Button>
+                  </Link>
+                </div>
               </>
             )}
 
@@ -122,12 +124,14 @@ export default async function RaffleDetailPage({
                       {formatExpirationTime(raffle.qr_code_expires_at)}
                     </span>
                   </div>
-                  <Link href={`/admin/raffles/${raffle.id}/qr`}>
-                    <Button className="w-full">
-                      <QrCode className="mr-2 h-4 w-4" />
-                      View QR Code
-                    </Button>
-                  </Link>
+                  <div className="mt-4">
+                    <Link href={`/admin/raffles/${raffle.id}/qr`}>
+                      <Button className="w-full">
+                        <QrCode className="mr-2 h-4 w-4" />
+                        View QR Code
+                      </Button>
+                    </Link>
+                  </div>
                 </>
               )}
 
@@ -140,12 +144,14 @@ export default async function RaffleDetailPage({
                     <AlertCircle className="h-4 w-4" />
                     <span>QR code has expired</span>
                   </div>
-                  <Link href={`/admin/raffles/${raffle.id}/qr`}>
-                    <Button variant="outline" className="w-full">
-                      <QrCode className="mr-2 h-4 w-4" />
-                      Regenerate QR Code
-                    </Button>
-                  </Link>
+                  <div className="mt-4">
+                    <Link href={`/admin/raffles/${raffle.id}/qr`}>
+                      <Button variant="outline" className="w-full">
+                        <QrCode className="mr-2 h-4 w-4" />
+                        Regenerate QR Code
+                      </Button>
+                    </Link>
+                  </div>
                 </>
               )}
 
@@ -177,12 +183,14 @@ export default async function RaffleDetailPage({
                 No prizes added yet. Add prizes that participants can win.
               </p>
             )}
-            <Link href={`/admin/raffles/${raffle.id}/prizes`}>
-              <Button className="w-full">
-                <Plus className="mr-2 h-4 w-4" />
-                Manage Prizes
-              </Button>
-            </Link>
+            <div className="mt-4">
+              <Link href={`/admin/raffles/${raffle.id}/prizes`}>
+                <Button className="w-full">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Manage Prizes
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
 
