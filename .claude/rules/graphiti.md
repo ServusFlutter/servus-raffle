@@ -10,7 +10,7 @@ This project uses a single namespace for all knowledge to ensure:
 - Cross-references work naturally
 - No risk of missing relevant information by querying the wrong namespace
 
-Do NOT create or use other group_ids. All project knowledge—preferences, procedures, implementation notes, technical decisions—belongs in `kff-project`.
+Do NOT create or use other group_ids. All project knowledge—preferences, procedures, implementation notes, technical decisions—belongs in `Servus-raffle`.
 
 ### Before Starting Any Task
 
