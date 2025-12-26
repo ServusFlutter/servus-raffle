@@ -12,7 +12,18 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    ignores: [".next/**/*", "node_modules/**/*"],
+    ignores: [
+      ".next/**/*",
+      "node_modules/**/*",
+      "coverage/**/*",
+    ],
+  },
+  {
+    // Allow require() in Jest config files (CommonJS)
+    files: ["jest.config.js", "jest.integration.config.js", "jest.integration.setup.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
   },
 ];
 

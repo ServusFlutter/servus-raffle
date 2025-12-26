@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import { TicketCircle, getTicketMessage } from "./ticketCircle";
 
 describe("TicketCircle", () => {
@@ -175,6 +175,15 @@ describe("TicketCircle", () => {
   });
 
   describe("count change animation", () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.runOnlyPendingTimers();
+      jest.useRealTimers();
+    });
+
     it("applies scale-105 class when count changes", async () => {
       const { container, rerender } = render(<TicketCircle count={1} />);
 
@@ -186,10 +195,14 @@ describe("TicketCircle", () => {
 
       // Animation should be triggered
       expect(number).toHaveClass("scale-105");
+
+      // Clean up timers properly wrapped in act
+      await act(async () => {
+        jest.runAllTimers();
+      });
     });
 
     it("removes scale-105 class after animation duration", async () => {
-      jest.useFakeTimers();
       const { container, rerender } = render(<TicketCircle count={1} />);
 
       rerender(<TicketCircle count={2} />);
@@ -197,14 +210,12 @@ describe("TicketCircle", () => {
       const number = container.querySelector('[data-testid="ticket-number"]');
       expect(number).toHaveClass("scale-105");
 
-      // Advance timers by 300ms (animation duration) wrapped in act
-      await jest.runAllTimersAsync();
-
-      // Re-render to reflect state change
-      rerender(<TicketCircle count={2} />);
+      // Advance timers wrapped in act
+      await act(async () => {
+        jest.runAllTimers();
+      });
 
       expect(number).not.toHaveClass("scale-105");
-      jest.useRealTimers();
     });
 
     it("has transition classes for smooth animation", () => {

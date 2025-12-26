@@ -1,0 +1,19 @@
+#!/bin/sh
+
+echo "🔍 Running pre-commit checks..."
+
+# Run linting
+echo "→ Linting..."
+npm run lint || {
+  echo "❌ Lint failed. Fix errors before committing."
+  exit 1
+}
+
+# Run unit tests
+echo "→ Running tests..."
+npm run test || {
+  echo "❌ Tests failed. Fix failing tests before committing."
+  exit 1
+}
+
+echo "✅ All checks passed!"

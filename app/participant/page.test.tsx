@@ -13,7 +13,7 @@ describe("ParticipantDashboard", () => {
 
   it("renders placeholder for ticket display", async () => {
     const result = await ParticipantDashboard();
-    const { container } = render(result as React.ReactElement);
+    render(result as React.ReactElement);
 
     // Should indicate tickets will be shown here
     expect(
@@ -26,7 +26,6 @@ describe("ParticipantDashboard", () => {
     const { container } = render(result as React.ReactElement);
 
     // Should have a container div
-    const mainContainer = container.querySelector("div");
-    expect(mainContainer).toBeInTheDocument();
+    expect(container.querySelector("div")).toBeInTheDocument();
   });
 });

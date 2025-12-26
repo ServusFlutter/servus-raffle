@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * POST /logout
  * Logs out the current user and redirects to login page
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const supabase = await createClient();
 

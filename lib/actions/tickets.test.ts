@@ -3,11 +3,12 @@
  */
 import { joinRaffle, getParticipation, getAccumulatedTickets } from "./tickets";
 import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
 
 // Mock dependencies
 jest.mock("@/lib/supabase/server");
-jest.mock("next/cache");
+jest.mock("@/lib/supabase/admin");
+
+import { createAdminClient } from "@/lib/supabase/admin";
 
 interface MockSupabaseClient {
   auth: {
@@ -22,6 +23,7 @@ interface MockSupabaseClient {
 
 describe("Ticket Server Actions", () => {
   let mockSupabase: MockSupabaseClient;
+  let mockAdminClient: MockSupabaseClient;
 
   const validRaffleId = "123e4567-e89b-12d3-a456-426614174000";
   const validUserId = "123e4567-e89b-12d3-a456-426614174001";
@@ -43,7 +45,7 @@ describe("Ticket Server Actions", () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Create a fresh mock for each test
+    // Create a fresh mock for auth client (createClient)
     mockSupabase = {
       auth: {
         getUser: jest.fn(),
@@ -55,7 +57,20 @@ describe("Ticket Server Actions", () => {
       single: jest.fn(),
     };
 
+    // Create a fresh mock for admin client (createAdminClient)
+    mockAdminClient = {
+      auth: {
+        getUser: jest.fn(),
+      },
+      from: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn(),
+    };
+
     (createClient as jest.Mock).mockResolvedValue(mockSupabase);
+    (createAdminClient as jest.Mock).mockReturnValue(mockAdminClient);
   });
 
   describe("joinRaffle", () => {
@@ -118,7 +133,7 @@ describe("Ticket Server Actions", () => {
       });
 
       it("returns error when raffle not found", async () => {
-        mockSupabase.single.mockResolvedValueOnce({
+        mockAdminClient.single.mockResolvedValueOnce({
           data: null,
           error: { code: "PGRST116", message: "Not found" },
         });
@@ -132,7 +147,7 @@ describe("Ticket Server Actions", () => {
       });
 
       it("returns error when raffle is not active", async () => {
-        mockSupabase.single.mockResolvedValueOnce({
+        mockAdminClient.single.mockResolvedValueOnce({
           data: { ...mockRaffle, status: "draft" },
           error: null,
         });
@@ -146,7 +161,7 @@ describe("Ticket Server Actions", () => {
       });
 
       it("returns error when raffle is completed", async () => {
-        mockSupabase.single.mockResolvedValueOnce({
+        mockAdminClient.single.mockResolvedValueOnce({
           data: { ...mockRaffle, status: "completed" },
           error: null,
         });
@@ -169,8 +184,8 @@ describe("Ticket Server Actions", () => {
       });
 
       it("returns existing participant without creating duplicate", async () => {
-        // Mock raffle lookup
-        mockSupabase.single
+        // Mock raffle lookup (via adminClient)
+        mockAdminClient.single
           .mockResolvedValueOnce({
             data: mockRaffle,
             error: null,
@@ -191,15 +206,12 @@ describe("Ticket Server Actions", () => {
           error: null,
         });
         // Should NOT call insert
-        expect(mockSupabase.insert).not.toHaveBeenCalled();
-        expect(revalidatePath).toHaveBeenCalledWith(
-          `/participant/raffle/${validRaffleId}`
-        );
+        expect(mockAdminClient.insert).not.toHaveBeenCalled();
       });
 
       it("handles race condition with unique constraint violation", async () => {
-        // Mock raffle lookup
-        mockSupabase.single
+        // Mock raffle lookup (via adminClient)
+        mockAdminClient.single
           .mockResolvedValueOnce({
             data: mockRaffle,
             error: null,
@@ -241,8 +253,8 @@ describe("Ticket Server Actions", () => {
       });
 
       it("creates new participant with 1 ticket", async () => {
-        // Mock raffle lookup
-        mockSupabase.single
+        // Mock raffle lookup (via adminClient)
+        mockAdminClient.single
           .mockResolvedValueOnce({
             data: mockRaffle,
             error: null,
@@ -267,15 +279,12 @@ describe("Ticket Server Actions", () => {
           },
           error: null,
         });
-        expect(mockSupabase.from).toHaveBeenCalledWith("participants");
-        expect(mockSupabase.insert).toHaveBeenCalledWith({
+        expect(mockAdminClient.from).toHaveBeenCalledWith("participants");
+        expect(mockAdminClient.insert).toHaveBeenCalledWith({
           raffle_id: validRaffleId,
           user_id: validUserId,
           ticket_count: 1,
         });
-        expect(revalidatePath).toHaveBeenCalledWith(
-          `/participant/raffle/${validRaffleId}`
-        );
       });
     });
 
@@ -288,8 +297,8 @@ describe("Ticket Server Actions", () => {
       });
 
       it("returns error on insert failure", async () => {
-        // Mock raffle lookup
-        mockSupabase.single
+        // Mock raffle lookup (via adminClient)
+        mockAdminClient.single
           .mockResolvedValueOnce({
             data: mockRaffle,
             error: null,

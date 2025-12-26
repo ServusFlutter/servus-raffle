@@ -2,13 +2,19 @@
  * @jest-environment node
  */
 import { middleware } from "./middleware";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 jest.mock("@supabase/ssr");
 
+interface MockSupabaseClient {
+  auth: {
+    getUser: jest.Mock;
+  };
+}
+
 describe("middleware", () => {
-  let mockSupabase: any;
+  let mockSupabase: MockSupabaseClient;
   let mockRequest: NextRequest;
 
   beforeEach(() => {

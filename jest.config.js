@@ -16,8 +16,13 @@ const customJestConfig = {
     '**/__tests__/**/*.[jt]s?(x)',
     '**/?(*.)+(spec|test).[jt]s?(x)',
   ],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/__integration__/',
+  ],
   testEnvironmentOptions: {
     customExportConditions: [''],
+    url: 'http://localhost:4000',
   },
 }
 

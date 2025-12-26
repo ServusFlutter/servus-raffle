@@ -125,11 +125,8 @@ describe("AdminLayout Authorization", () => {
       error: "Not authenticated",
     });
 
-    // Import the AdminHeader component directly to test authorization
-    const { AdminHeader } = await import("./layout").then((module) => {
-      // Extract AdminHeader for testing - this is a workaround since it's not exported
-      return { AdminHeader: null }; // Can't directly test non-exported component
-    });
+    // Import the layout to trigger module loading - AdminHeader is not exported
+    await import("./layout");
 
     // Since AdminHeader is not exported, we test the redirect behavior indirectly
     // The redirect function should be called when getCurrentUser returns error

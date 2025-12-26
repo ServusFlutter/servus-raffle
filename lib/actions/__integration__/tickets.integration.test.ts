@@ -88,7 +88,7 @@ describe('Tickets Integration Tests', () => {
 
     it('should allow authenticated users to read active raffles', async () => {
       // Sign in as test user
-      const { data: signInData, error: signInError } = await anonClient.auth.signInWithPassword({
+      const { error: signInError } = await anonClient.auth.signInWithPassword({
         email: testUserEmail,
         password: global.TEST_PASSWORD,
       })
@@ -206,7 +206,7 @@ describe('Tickets Integration Tests', () => {
 
       // Try to read with unauthenticated client
       const freshClient = createClient(supabaseUrl, supabaseAnonKey)
-      const { data, error } = await freshClient
+      const { data } = await freshClient
         .from('winners')
         .select('*')
 

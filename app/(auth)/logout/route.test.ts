@@ -9,8 +9,14 @@ import { NextResponse, NextRequest } from "next/server";
 jest.mock("@/lib/supabase/server");
 jest.mock("next/navigation");
 
+interface MockSupabaseClient {
+  auth: {
+    signOut: jest.Mock;
+  };
+}
+
 describe("Logout Route Handler", () => {
-  let mockSupabase: any;
+  let mockSupabase: MockSupabaseClient;
   let mockRequest: NextRequest;
 
   beforeEach(() => {
@@ -37,7 +43,7 @@ describe("Logout Route Handler", () => {
       );
 
       // Act
-      const result = await POST(mockRequest);
+      const result = await POST();
 
       // Assert
       expect(mockSupabase.auth.signOut).toHaveBeenCalledTimes(1);
@@ -52,7 +58,7 @@ describe("Logout Route Handler", () => {
       });
 
       // Act
-      const response = await POST(mockRequest);
+      const response = await POST();
       const data = await response.json();
 
       // Assert
@@ -69,7 +75,7 @@ describe("Logout Route Handler", () => {
       );
 
       // Act
-      const response = await POST(mockRequest);
+      const response = await POST();
       const data = await response.json();
 
       // Assert
