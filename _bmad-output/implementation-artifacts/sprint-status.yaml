@@ -65,8 +65,8 @@ development_status:
   epic-3-retrospective: done
 
   # Epic 4: Prize Management
-  epic-4: backlog
-  4-1-add-prizes-to-raffle: backlog
+  epic-4: in-progress
+  4-1-add-prizes-to-raffle: done
   4-2-prize-ordering-for-sequential-drawing: backlog
   4-3-track-prize-award-status: backlog
   epic-4-retrospective: optional

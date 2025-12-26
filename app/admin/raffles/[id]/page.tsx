@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, QrCode, Clock, AlertCircle } from "lucide-react";
+import { ArrowLeft, QrCode, Clock, AlertCircle, Gift, Plus } from "lucide-react";
 import { getRaffle } from "@/lib/actions/raffles";
+import { getPrizeCount } from "@/lib/actions/prizes";
 import {
   Card,
   CardContent,
@@ -30,7 +31,13 @@ export default async function RaffleDetailPage({
   params,
 }: RaffleDetailPageProps) {
   const { id } = await params;
-  const { data: raffle, error } = await getRaffle(id);
+  const [raffleResult, prizeCountResult] = await Promise.all([
+    getRaffle(id),
+    getPrizeCount(id),
+  ]);
+
+  const { data: raffle, error } = raffleResult;
+  const prizeCount = prizeCountResult.data ?? 0;
 
   if (error || !raffle) {
     notFound();
@@ -154,13 +161,28 @@ export default async function RaffleDetailPage({
         {/* Prizes Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Prizes</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Gift className="h-5 w-5" />
+              Prizes
+            </CardTitle>
             <CardDescription>Manage prizes for this raffle</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Prize management will be available in a future update.
-            </p>
+          <CardContent className="space-y-4">
+            {prizeCount > 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {prizeCount} {prizeCount === 1 ? "prize" : "prizes"} configured
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No prizes added yet. Add prizes that participants can win.
+              </p>
+            )}
+            <Link href={`/admin/raffles/${raffle.id}/prizes`}>
+              <Button className="w-full">
+                <Plus className="mr-2 h-4 w-4" />
+                Manage Prizes
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
