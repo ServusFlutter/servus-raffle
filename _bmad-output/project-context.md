@@ -1,10 +1,10 @@
 ---
 project_name: 'servus-raffle'
 user_name: 'Ben'
-date: '2025-12-25'
-sections_completed: ['technology_stack', 'implementation_rules', 'project_structure', 'testing', 'error_handling', 'critical_rules', 'usage_guidelines']
+date: '2025-12-26'
+sections_completed: ['technology_stack', 'implementation_rules', 'project_structure', 'testing', 'integration_testing', 'error_handling', 'critical_rules', 'usage_guidelines']
 status: 'complete'
-rule_count: 25
+rule_count: 27
 optimized_for_llm: true
 ---
 
@@ -146,6 +146,138 @@ lib/
 
 ---
 
+## Integration Testing with Supabase
+
+### Dual Instance Architecture
+
+We run **two separate Supabase instances** to isolate development from testing:
+
+| Instance | Ports | Purpose |
+|----------|-------|---------|
+| Dev | 54321-54327 | Manual testing, development |
+| Test | 54421-54427 | Automated integration tests |
+
+```
+servus-raffle/
+├── supabase/                    # DEV instance config
+│   ├── config.toml
+│   ├── migrations/              # SINGLE SOURCE OF TRUTH
+│   └── seed.sql
+│
+└── supabase-test/               # TEST instance config
+    └── supabase/
+        ├── config.toml
+        ├── migrations -> ../../supabase/migrations  # SYMLINK
+        └── seed.sql             # Test-specific seed data
+```
+
+**Note:** Test instance uses a symlink to share migrations with dev. New migrations automatically apply to both instances.
+
+### Commands
+
+```bash
+# Unit tests (mocked, fast)
+npm run test
+
+# Integration tests (real Supabase, slower)
+npm run test:integration
+
+# Dev instance management
+npm run supabase:start
+npm run supabase:stop
+npm run supabase:reset
+npm run supabase:status
+npm run supabase:lint        # Postgres type/syntax check
+npm run supabase:security    # Security Advisor checks (search_path, RLS, etc.)
+
+# Test instance management
+npm run supabase:test:start
+npm run supabase:test:stop
+npm run supabase:test:reset
+```
+
+### Writing Integration Tests
+
+**Location:** Place integration tests in `__integration__` folders:
+```
+lib/actions/__integration__/tickets.integration.test.ts
+```
+
+**Test file naming:** `*.integration.test.ts`
+
+**Template:**
+```typescript
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const adminClient = createClient(supabaseUrl, supabaseServiceKey)
+
+describe('Feature Integration Tests', () => {
+  let testUserId: string
+
+  beforeAll(async () => {
+    // Create test user via Supabase Auth Admin API
+    const { data } = await adminClient.auth.admin.createUser({
+      email: `test-${Date.now()}@example.com`,
+      password: 'testpassword123',
+      email_confirm: true,
+    })
+    testUserId = data.user!.id
+
+    // Create public.users record
+    await adminClient.from('users').insert({
+      id: testUserId,
+      email: data.user!.email,
+      name: 'Test User',
+    })
+  })
+
+  afterAll(async () => {
+    // Clean up test data
+    await adminClient.from('users').delete().eq('id', testUserId)
+    await adminClient.auth.admin.deleteUser(testUserId)
+  })
+
+  it('should test RLS policies with real database', async () => {
+    // Test against real Supabase instance
+  })
+})
+```
+
+### CRITICAL: Integration Test Requirements for New Features
+
+**When implementing any story that touches:**
+
+1. **Database schema changes** → Add migration to `supabase/migrations/` (symlinked to test instance)
+2. **RLS policies** → Add integration test verifying policy works correctly
+3. **Server Actions with DB operations** → Add integration test for the action
+4. **Authentication flows** → Add integration test with real auth
+
+**Checklist for each story:**
+- [ ] Unit tests (mocked) for component logic
+- [ ] Integration tests for database operations
+- [ ] Both test suites pass: `npm run test` AND `npm run test:integration`
+- [ ] Security check passes: `npm run supabase:security` (0 issues)
+
+### Test Data (Known UUIDs)
+
+Test seed data uses predictable UUIDs for assertions:
+```typescript
+// From supabase-test/supabase/seed.sql
+global.TEST_RAFFLE_ACTIVE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+global.TEST_RAFFLE_DRAFT_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+global.TEST_RAFFLE_COMPLETED_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
+```
+
+### Prerequisites
+
+- Docker Desktop running
+- Both instances started: `npm run supabase:start && npm run supabase:test:start`
+- `.env.test` configured (copy from `.env.test.example`)
+
+---
+
 ## Error Handling
 
 | Error Type | Handling |
@@ -173,6 +305,8 @@ toast.error("No participants to draw from")
 3. **NEVER** mix event naming conventions (always SCREAMING_SNAKE_CASE)
 4. **NEVER** access Supabase service role key from client
 5. **NEVER** store secrets in NEXT_PUBLIC_* variables
+6. **NEVER** skip integration tests for database/RLS changes
+7. **NEVER** break the migrations symlink in `supabase-test/supabase/migrations`
 
 ### Security Rules
 
@@ -203,7 +337,9 @@ The wheel animation MUST be synchronized across all devices:
 | Server Actions | Return `{ data, error }` |
 | Events | `SCREAMING_SNAKE_CASE` |
 | Validation | Zod schemas |
-| Tests | Co-located |
+| Unit tests | Co-located `*.test.tsx` |
+| Integration tests | `__integration__/*.integration.test.ts` |
+| Migrations | `supabase/migrations/` (symlinked to test) |
 
 ---
 
@@ -223,4 +359,4 @@ The wheel animation MUST be synchronized across all devices:
 
 ---
 
-_Last Updated: 2025-12-25_
+_Last Updated: 2025-12-26_

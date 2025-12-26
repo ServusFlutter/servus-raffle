@@ -6,7 +6,18 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset",
+    "supabase:status": "supabase status",
+    "supabase:lint": "supabase db lint",
+    "supabase:security": "./scripts/security-check.sh",
+    "supabase:security:test": "./scripts/security-check.sh test",
+    "supabase:test:start": "supabase start --workdir supabase-test",
+    "supabase:test:stop": "supabase stop --workdir supabase-test",
+    "supabase:test:reset": "supabase db reset --workdir supabase-test",
+    "test:integration": "npm run supabase:test:reset && jest --config jest.integration.config.js"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
