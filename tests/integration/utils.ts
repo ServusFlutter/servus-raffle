@@ -53,9 +53,9 @@ export const TEST_IDS = {
   DRAFT_RAFFLE: 'bbbb2222-2222-2222-2222-222222222222',
   COMPLETED_RAFFLE: 'cccc3333-3333-3333-3333-333333333333',
 
-  // Prizes
-  PRIZE_1: 'pppp1111-1111-1111-1111-111111111111',
-  PRIZE_2: 'pppp2222-2222-2222-2222-222222222222',
+  // Prizes (using valid hex - 'dddd' instead of 'pppp')
+  PRIZE_1: 'dddd1111-1111-1111-1111-111111111111',
+  PRIZE_2: 'dddd2222-2222-2222-2222-222222222222',
 } as const
 
 type TableName = 'profiles' | 'raffles' | 'participants' | 'prizes' | 'winners'

@@ -88,10 +88,10 @@ INSERT INTO public.participants (raffle_id, user_id, ticket_count) VALUES
   ('aaaa1111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333', 3)
 ON CONFLICT (raffle_id, user_id) DO UPDATE SET ticket_count = EXCLUDED.ticket_count;
 
--- Insert test prizes
+-- Insert test prizes (using valid hex UUIDs - 'dddd' instead of 'pppp')
 INSERT INTO public.prizes (id, raffle_id, name, sort_order) VALUES
-  ('pppp1111-1111-1111-1111-111111111111', 'aaaa1111-1111-1111-1111-111111111111', 'First Prize', 1),
-  ('pppp2222-2222-2222-2222-222222222222', 'aaaa1111-1111-1111-1111-111111111111', 'Second Prize', 2)
+  ('dddd1111-1111-1111-1111-111111111111', 'aaaa1111-1111-1111-1111-111111111111', 'First Prize', 1),
+  ('dddd2222-2222-2222-2222-222222222222', 'aaaa1111-1111-1111-1111-111111111111', 'Second Prize', 2)
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   sort_order = EXCLUDED.sort_order;
