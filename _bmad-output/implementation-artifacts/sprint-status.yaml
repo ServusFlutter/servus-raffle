@@ -72,9 +72,9 @@ development_status:
   epic-4-retrospective: done
 
   # Epic 5: Admin Dashboard & Participant Visibility
-  epic-5: backlog
-  5-1-participant-list-and-statistics-dashboard: backlog
-  5-2-raffle-history-view: backlog
+  epic-5: in-progress
+  5-1-participant-list-and-statistics-dashboard: done
+  5-2-raffle-history-view: ready-for-dev
   5-3-participant-prize-and-status-view: backlog
   epic-5-retrospective: optional
 

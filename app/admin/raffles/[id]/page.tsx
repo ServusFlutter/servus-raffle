@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, QrCode, Clock, AlertCircle, Gift, Plus } from "lucide-react";
+import { ArrowLeft, QrCode, Clock, AlertCircle, Gift, Plus, Users, Ticket } from "lucide-react";
 import { getRaffle } from "@/lib/actions/raffles";
 import { getPrizeCount } from "@/lib/actions/prizes";
+import { getRaffleStatistics } from "@/lib/actions/participants";
 import {
   Card,
   CardContent,
@@ -31,13 +32,15 @@ export default async function RaffleDetailPage({
   params,
 }: RaffleDetailPageProps) {
   const { id } = await params;
-  const [raffleResult, prizeCountResult] = await Promise.all([
+  const [raffleResult, prizeCountResult, statsResult] = await Promise.all([
     getRaffle(id),
     getPrizeCount(id),
+    getRaffleStatistics(id),
   ]);
 
   const { data: raffle, error } = raffleResult;
   const prizeCount = prizeCountResult.data ?? 0;
+  const stats = statsResult.data;
 
   if (error || !raffle) {
     notFound();
@@ -197,13 +200,43 @@ export default async function RaffleDetailPage({
         {/* Participants Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Participants</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Participants
+            </CardTitle>
             <CardDescription>View who has joined this raffle</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Participant list will be available in a future update.
-            </p>
+          <CardContent className="space-y-4">
+            {stats ? (
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">
+                    <span className="font-semibold">{stats.participantCount}</span>{" "}
+                    {stats.participantCount === 1 ? "participant" : "participants"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Ticket className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">
+                    <span className="font-semibold">{stats.totalTickets}</span>{" "}
+                    {stats.totalTickets === 1 ? "ticket" : "tickets"}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No participants yet.
+              </p>
+            )}
+            <div className="mt-4">
+              <Link href={`/admin/raffles/${raffle.id}/participants`}>
+                <Button variant="outline" className="w-full">
+                  <Users className="mr-2 h-4 w-4" />
+                  View Participants
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
 

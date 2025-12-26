@@ -152,6 +152,69 @@ export function subscribeToPrizeAwards(
  */
 
 /**
+ * Payload type for participant change events
+ */
+export type ParticipantChangePayload = RealtimePostgresChangesPayload<{
+  [key: string]: unknown;
+}>;
+
+/**
+ * Callback type for participant update events
+ */
+export type ParticipantUpdateCallback = (payload: ParticipantChangePayload) => void;
+
+/**
+ * Subscribe to participant changes for a specific raffle.
+ *
+ * This creates a Postgres Changes subscription that will receive
+ * real-time updates when participants join the raffle.
+ *
+ * Used for Story 5-1: Participant List & Statistics Dashboard (FR37).
+ *
+ * @example
+ * ```typescript
+ * // In a React component
+ * useEffect(() => {
+ *   const channel = subscribeToParticipantChanges(raffleId, (payload) => {
+ *     if (payload.eventType === 'INSERT') {
+ *       // New participant joined
+ *       refreshParticipants();
+ *       refreshStatistics();
+ *     }
+ *   });
+ *
+ *   return () => {
+ *     channel.unsubscribe();
+ *   };
+ * }, [raffleId]);
+ * ```
+ *
+ * @param raffleId - UUID of the raffle to monitor
+ * @param onParticipantChange - Callback invoked when participants change
+ * @returns RealtimeChannel that can be used to unsubscribe
+ */
+export function subscribeToParticipantChanges(
+  raffleId: string,
+  onParticipantChange: ParticipantUpdateCallback
+): RealtimeChannel {
+  const supabase = createClient();
+
+  return supabase
+    .channel(`participants:${raffleId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT", // Only listen to new participants joining
+        schema: "public",
+        table: "participants",
+        filter: `raffle_id=eq.${raffleId}`,
+      },
+      onParticipantChange
+    )
+    .subscribe();
+}
+
+/**
  * Clean up a realtime subscription
  *
  * @param channel - The RealtimeChannel to unsubscribe from
