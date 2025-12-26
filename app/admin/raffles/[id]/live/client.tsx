@@ -3,11 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { X, Users, Ticket, Trophy, Gift, Wifi, WifiOff } from "lucide-react";
+import { X, Users, Ticket, Trophy, Gift, Wifi, WifiOff, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { useBroadcastChannel } from "@/lib/supabase/useBroadcastChannel";
 import { WinnerCelebration, SUSPENSE_PAUSE_MS } from "@/components/raffle/winnerCelebration";
 import { subscribeToParticipantChanges } from "@/lib/supabase/realtime";
+import { drawWinner } from "@/lib/actions/draw";
 import type { PrizeWithWinner } from "@/lib/actions/prizes";
 import type {
   BroadcastEvent,
@@ -78,6 +80,11 @@ export function LiveDrawClient({
     prizeName: string;
   } | null>(null);
 
+  // Story 6.7: Cooldown and drawing state
+  const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [raffleEnded, setRaffleEnded] = useState(false);
+
   // Suppress unused variable warnings - these are intentional placeholders for Story 6.3/6.4
   void drawInProgress;
   void currentDrawPrize;
@@ -130,6 +137,8 @@ export function LiveDrawClient({
       setWheelSeed(null);
       setRevealedWinner(null);
       setShowCelebration(false);
+      // Story 6.7: Mark raffle as ended
+      setRaffleEnded(true);
       // Refresh to get final raffle state
       router.refresh();
     },
@@ -142,14 +151,51 @@ export function LiveDrawClient({
     router.refresh();
   }, [router]);
 
-  // Handler for celebration completion (Story 6.5)
+  // Handler for celebration completion (Story 6.5, 6.7)
   const handleCelebrationComplete = useCallback(() => {
     console.log("[LiveDraw] Celebration complete");
     setShowCelebration(false);
     setRevealedWinner(null);
+    // Story 6.7: Start 5-second cooldown before allowing next draw
+    setCooldownSeconds(5);
     // Refresh to get updated prize data
     router.refresh();
   }, [router]);
+
+  // Story 6.7: Cooldown countdown effect
+  useEffect(() => {
+    if (cooldownSeconds > 0) {
+      const timer = setTimeout(() => {
+        setCooldownSeconds(cooldownSeconds - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldownSeconds]);
+
+  // Story 6.7: Get next prize to draw (first non-awarded by sort_order)
+  const getNextPrize = useCallback(() => {
+    return prizes.find((p) => !p.awarded_to);
+  }, [prizes]);
+
+  // Story 6.7: Handle draw next prize
+  const handleDrawNextPrize = useCallback(async () => {
+    const nextPrize = getNextPrize();
+    if (!nextPrize || isDrawing) return;
+
+    setIsDrawing(true);
+    try {
+      const result = await drawWinner(raffleId, nextPrize.id);
+      if (result.error) {
+        toast.error(result.error);
+      }
+      // Wheel animation and celebration will trigger via broadcast
+    } catch (e) {
+      console.error("[LiveDraw] Error drawing winner:", e);
+      toast.error("Failed to draw winner");
+    } finally {
+      setIsDrawing(false);
+    }
+  }, [raffleId, getNextPrize, isDrawing]);
 
   // Subscribe to broadcast channel for draw events (Story 6.2 AC #1, #2)
   const { connectionState, isConnected, reconnect } = useBroadcastChannel(raffleId, {
@@ -184,12 +230,11 @@ export function LiveDrawClient({
     console.log(`[LiveDraw] Broadcast connection state: ${connectionState}`);
   }, [connectionState]);
 
-  // _raffleStatus is available for Story 6.3 when we implement:
-  // - Different button states based on status (drawing vs active)
-  // - Status transition handling
-  void _raffleStatus;
+  // Story 6.7: Check if raffle is completed
+  const isRaffleCompleted = _raffleStatus === "completed" || raffleEnded;
   const allPrizesAwarded = awardedCount === totalPrizes && totalPrizes > 0;
   const noPrizes = totalPrizes === 0;
+  const nextPrize = getNextPrize();
 
   return (
     <div
@@ -305,33 +350,59 @@ export function LiveDrawClient({
           </div>
         )}
 
-        {/* All Prizes Awarded State */}
-        {allPrizesAwarded && (
+        {/* All Prizes Awarded State (Story 6.7 AC #3, #6) */}
+        {(allPrizesAwarded || isRaffleCompleted) && (
           <div
             className="text-center mb-16"
             data-testid="all-prizes-awarded"
+            role="status"
+            aria-live="polite"
           >
             <Trophy className="h-24 w-24 mx-auto mb-6 text-yellow-400" />
             <p className="text-3xl md:text-4xl font-bold">
-              Raffle Complete!
+              All prizes awarded - Raffle Complete!
             </p>
             <p className="text-xl md:text-2xl text-white/60 mt-4">
               All {totalPrizes} prizes have been awarded
             </p>
+            {/* Story 6.7 AC #6: View History Button */}
+            <Link href="/admin/history">
+              <Button
+                variant="outline"
+                size="lg"
+                className="mt-8 text-lg px-8 py-4 h-auto border-white/30 text-white hover:bg-white/10"
+                data-testid="view-history-button"
+              >
+                <History className="mr-2 h-5 w-5" />
+                View History
+              </Button>
+            </Link>
           </div>
         )}
 
-        {/* Draw Winner Button - Large, prominent (AC #3) */}
-        {/* Disabled until Story 6.3 implements actual drawing logic */}
-        {!allPrizesAwarded && !noPrizes && (
+        {/* Draw Winner Button - Large, prominent (Story 6.7) */}
+        {!allPrizesAwarded && !noPrizes && !isRaffleCompleted && nextPrize && !showCelebration && (
           <Button
             size="lg"
-            disabled
+            onClick={handleDrawNextPrize}
+            disabled={cooldownSeconds > 0 || isDrawing}
             className="text-2xl md:text-3xl px-12 md:px-16 py-6 md:py-8 h-auto bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="draw-button"
-            aria-label="Draw Winner button - available in future update"
+            aria-label={
+              cooldownSeconds > 0
+                ? `Wait ${cooldownSeconds} seconds before next draw`
+                : isDrawing
+                  ? "Drawing in progress"
+                  : `Draw winner for ${nextPrize.name}`
+            }
           >
-            Draw Winner
+            {cooldownSeconds > 0
+              ? `Wait ${cooldownSeconds}s...`
+              : isDrawing
+                ? "Drawing..."
+                : awardedCount === 0
+                  ? `Draw Winner: ${nextPrize.name}`
+                  : `Draw Next Prize: ${nextPrize.name}`}
           </Button>
         )}
 
@@ -369,40 +440,46 @@ export function LiveDrawClient({
         </div>
       </div>
 
-      {/* Prize List Summary - Bottom of screen (subtle) */}
+      {/* Prize List Summary - Bottom of screen (Story 6.7: highlight next prize to draw) */}
       {prizes.length > 0 && (
         <div
           className="px-8 py-6 border-t border-white/10"
           data-testid="prize-summary"
         >
           <div className="flex justify-center gap-4 flex-wrap">
-            {prizes.map((prize, index) => (
-              <div
-                key={prize.id}
-                className={`px-4 py-2 rounded-lg text-sm md:text-base ${
-                  prize.awarded_to
-                    ? "bg-green-900/30 text-green-400"
-                    : index === currentPrizeIndex
-                      ? "bg-primary/20 text-primary border border-primary/40"
-                      : "bg-white/5 text-white/40"
-                }`}
-                data-testid={`prize-item-${index}`}
-              >
-                {prize.awarded_to ? (
-                  <span className="flex items-center gap-2">
-                    <Trophy className="h-4 w-4" />
-                    {prize.name}
-                    {prize.winner_name && (
-                      <span className="text-white/60">
-                        - {prize.winner_name}
-                      </span>
-                    )}
-                  </span>
-                ) : (
-                  <span>{prize.name}</span>
-                )}
-              </div>
-            ))}
+            {prizes.map((prize, index) => {
+              const isNextToDraw = nextPrize?.id === prize.id;
+              return (
+                <div
+                  key={prize.id}
+                  className={`px-4 py-2 rounded-lg text-sm md:text-base transition-all ${
+                    prize.awarded_to
+                      ? "bg-green-900/30 text-green-400"
+                      : isNextToDraw
+                        ? "bg-primary/20 text-primary border border-primary/40 animate-pulse"
+                        : "bg-white/5 text-white/40"
+                  }`}
+                  data-testid={`prize-item-${index}`}
+                >
+                  {prize.awarded_to ? (
+                    <span className="flex items-center gap-2">
+                      <Trophy className="h-4 w-4" />
+                      {prize.name}
+                      {prize.winner_name && (
+                        <span className="text-white/60">
+                          - {prize.winner_name}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      {isNextToDraw && <Gift className="h-4 w-4" />}
+                      {prize.name}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

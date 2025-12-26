@@ -43,6 +43,20 @@ jest.mock("@/lib/supabase/realtime", () => ({
   })),
 }));
 
+// Mock sonner toast (Story 6.7)
+jest.mock("sonner", () => ({
+  toast: {
+    error: jest.fn(),
+    success: jest.fn(),
+    info: jest.fn(),
+  },
+}));
+
+// Mock draw action (Story 6.7)
+jest.mock("@/lib/actions/draw", () => ({
+  drawWinner: jest.fn().mockResolvedValue({ data: null, error: null }),
+}));
+
 describe("LiveDrawClient", () => {
   const mockPrizes: PrizeWithWinner[] = [
     {
@@ -252,20 +266,20 @@ describe("LiveDrawClient", () => {
     });
   });
 
-  describe("Draw Winner Button (AC #3)", () => {
-    it("renders Draw Winner button prominently", () => {
+  describe("Draw Winner Button (Story 6.7)", () => {
+    it("renders Draw Winner button prominently with prize name", () => {
       render(<LiveDrawClient {...defaultProps} />);
 
       const drawButton = screen.getByTestId("draw-button");
       expect(drawButton).toBeInTheDocument();
-      expect(drawButton).toHaveTextContent("Draw Winner");
+      expect(drawButton).toHaveTextContent("Draw Winner: Grand Prize");
     });
 
-    it("Draw Winner button is disabled (placeholder for Story 6.3)", () => {
+    it("Draw Winner button is enabled (Story 6.7 implementation)", () => {
       render(<LiveDrawClient {...defaultProps} />);
 
       const drawButton = screen.getByTestId("draw-button");
-      expect(drawButton).toBeDisabled();
+      expect(drawButton).not.toBeDisabled();
     });
 
     it("has large button styling for projection visibility", () => {
@@ -274,6 +288,32 @@ describe("LiveDrawClient", () => {
       const drawButton = screen.getByTestId("draw-button");
       expect(drawButton).toHaveClass("text-2xl");
       expect(drawButton).toHaveClass("px-12");
+    });
+
+    it("shows Draw Next Prize for subsequent prizes", () => {
+      const partiallyAwardedPrizes: PrizeWithWinner[] = [
+        {
+          ...mockPrizes[0],
+          awarded_to: "user-123",
+          awarded_at: "2025-12-25T10:00:00Z",
+          winner_name: "Jane Smith",
+        },
+        mockPrizes[1],
+        mockPrizes[2],
+      ];
+
+      const propsWithAwardedPrize = {
+        ...defaultProps,
+        currentPrize: mockPrizes[1],
+        currentPrizeIndex: 1,
+        awardedCount: 1,
+        prizes: partiallyAwardedPrizes,
+      };
+
+      render(<LiveDrawClient {...propsWithAwardedPrize} />);
+
+      const drawButton = screen.getByTestId("draw-button");
+      expect(drawButton).toHaveTextContent("Draw Next Prize: Second Prize");
     });
   });
 
@@ -309,7 +349,7 @@ describe("LiveDrawClient", () => {
     });
   });
 
-  describe("All Prizes Awarded State", () => {
+  describe("All Prizes Awarded State (Story 6.7)", () => {
     it("displays completion message when all prizes awarded", () => {
       const awardedPrizes: PrizeWithWinner[] = mockPrizes.map((p) => ({
         ...p,
@@ -330,7 +370,7 @@ describe("LiveDrawClient", () => {
 
       const completedMessage = screen.getByTestId("all-prizes-awarded");
       expect(completedMessage).toBeInTheDocument();
-      expect(completedMessage).toHaveTextContent("Raffle Complete!");
+      expect(completedMessage).toHaveTextContent("All prizes awarded - Raffle Complete!");
     });
 
     it("shows All prizes awarded in progress indicator", () => {
@@ -374,6 +414,29 @@ describe("LiveDrawClient", () => {
       render(<LiveDrawClient {...propsAllAwarded} />);
 
       expect(screen.queryByTestId("draw-button")).not.toBeInTheDocument();
+    });
+
+    it("shows View History button when raffle is complete", () => {
+      const awardedPrizes: PrizeWithWinner[] = mockPrizes.map((p) => ({
+        ...p,
+        awarded_to: "user-123",
+        awarded_at: "2025-12-25T10:00:00Z",
+        winner_name: "John Doe",
+      }));
+
+      const propsAllAwarded = {
+        ...defaultProps,
+        currentPrize: null,
+        currentPrizeIndex: -1,
+        awardedCount: 3,
+        prizes: awardedPrizes,
+      };
+
+      render(<LiveDrawClient {...propsAllAwarded} />);
+
+      const viewHistoryButton = screen.getByTestId("view-history-button");
+      expect(viewHistoryButton).toBeInTheDocument();
+      expect(viewHistoryButton).toHaveTextContent("View History");
     });
   });
 
@@ -532,6 +595,70 @@ describe("LiveDrawClient", () => {
 
       const ticketCount = screen.getByTestId("ticket-count");
       expect(ticketCount).toHaveTextContent("156");
+    });
+  });
+
+  describe("Cooldown Behavior (Story 6.7 AC #2)", () => {
+    it("button starts enabled with no cooldown", () => {
+      render(<LiveDrawClient {...defaultProps} />);
+
+      const drawButton = screen.getByTestId("draw-button");
+      expect(drawButton).not.toBeDisabled();
+      expect(drawButton).not.toHaveTextContent(/Wait/);
+    });
+
+    it("button shows Draw Winner for first prize", () => {
+      render(<LiveDrawClient {...defaultProps} />);
+
+      const drawButton = screen.getByTestId("draw-button");
+      expect(drawButton).toHaveTextContent("Draw Winner: Grand Prize");
+    });
+
+    it("button aria-label describes draw action", () => {
+      render(<LiveDrawClient {...defaultProps} />);
+
+      const drawButton = screen.getByTestId("draw-button");
+      expect(drawButton).toHaveAttribute(
+        "aria-label",
+        "Draw winner for Grand Prize"
+      );
+    });
+  });
+
+  describe("RAFFLE_ENDED Event Handling (Story 6.7 AC #3)", () => {
+    it("subscribes to onRaffleEnded handler", () => {
+      const { useBroadcastChannel } = jest.requireMock(
+        "@/lib/supabase/useBroadcastChannel"
+      );
+
+      render(<LiveDrawClient {...defaultProps} />);
+
+      expect(useBroadcastChannel).toHaveBeenCalledWith(
+        defaultProps.raffleId,
+        expect.objectContaining({
+          onRaffleEnded: expect.any(Function),
+        })
+      );
+    });
+
+    it("displays completion message when raffle status is completed", () => {
+      const propsCompleted = {
+        ...defaultProps,
+        raffleStatus: "completed",
+        awardedCount: 3,
+        currentPrize: null,
+        prizes: defaultProps.prizes.map((p) => ({
+          ...p,
+          awarded_to: "user-123",
+          awarded_at: "2025-12-25T10:00:00Z",
+          winner_name: "John Doe",
+        })),
+      };
+
+      render(<LiveDrawClient {...propsCompleted} />);
+
+      expect(screen.getByTestId("all-prizes-awarded")).toBeInTheDocument();
+      expect(screen.getByText(/All prizes awarded - Raffle Complete!/)).toBeInTheDocument();
     });
   });
 });

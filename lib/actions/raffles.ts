@@ -335,6 +335,160 @@ export async function activateRaffle(
  * }
  * ```
  */
+/**
+ * Update raffle status (admin only)
+ *
+ * Used to transition raffle to 'completed' after all prizes awarded.
+ * Story 6.7: Sequential Prize Drawing & Raffle Completion
+ *
+ * @param raffleId - UUID of the raffle
+ * @param status - New status ('drawing' | 'completed')
+ * @returns ActionResult with success or error
+ *
+ * @example
+ * ```typescript
+ * const result = await updateRaffleStatus(raffleId, "completed");
+ * if (result.error) {
+ *   toast.error(result.error);
+ * }
+ * ```
+ */
+export async function updateRaffleStatus(
+  raffleId: string,
+  status: "drawing" | "completed"
+): Promise<ActionResult<{ status: string }>> {
+  try {
+    // 1. Validate admin status
+    const adminUser = await getAdminUser();
+    if (!adminUser) {
+      return { data: null, error: "Unauthorized: Admin access required" };
+    }
+
+    // 2. Validate UUID format
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(raffleId)) {
+      return { data: null, error: "Invalid raffle ID" };
+    }
+
+    // 3. Validate status value
+    if (status !== "drawing" && status !== "completed") {
+      return { data: null, error: "Invalid status value" };
+    }
+
+    // 4. Update raffle status
+    const serviceClient = createServiceRoleClient();
+
+    const { data, error } = await serviceClient
+      .from("raffles")
+      .update({ status })
+      .eq("id", raffleId)
+      .select("status")
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return { data: null, error: "Raffle not found" };
+      }
+      console.error("Database error updating raffle status:", error);
+      return { data: null, error: "Failed to update raffle status" };
+    }
+
+    // 5. Revalidate relevant paths
+    revalidatePath(`/admin/raffles/${raffleId}`);
+    revalidatePath(`/admin/raffles/${raffleId}/live`);
+    revalidatePath("/admin");
+    revalidatePath("/admin/history");
+
+    return { data: { status: data.status }, error: null };
+  } catch (e) {
+    console.error("Unexpected error updating raffle status:", e);
+    return { data: null, error: "Failed to update raffle status" };
+  }
+}
+
+/**
+ * Raffle with winner count for dashboard display
+ * Story 6.7 AC #6
+ */
+export type RaffleWithWinnerCount = Raffle & {
+  winner_count: number;
+};
+
+/**
+ * Get all raffles with winner counts for the admin dashboard
+ * Returns raffles ordered by creation date (newest first)
+ * Includes winner count for completed raffles
+ *
+ * Story 6.7: Added winner count for dashboard display
+ *
+ * @returns ActionResult with array of raffles with winner counts or error
+ *
+ * @example
+ * ```typescript
+ * const result = await getRafflesWithWinnerCount()
+ * if (result.data) {
+ *   setRaffles(result.data)
+ * }
+ * ```
+ */
+export async function getRafflesWithWinnerCount(): Promise<ActionResult<RaffleWithWinnerCount[]>> {
+  try {
+    // 1. Validate admin status
+    const adminUser = await getAdminUser();
+    if (!adminUser) {
+      return { data: null, error: "Unauthorized: Admin access required" };
+    }
+
+    // 2. Fetch raffles using service role client
+    const serviceClient = createServiceRoleClient();
+
+    const { data: raffles, error: rafflesError } = await serviceClient
+      .from("raffles")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (rafflesError) {
+      console.error("Database error fetching raffles:", rafflesError);
+      return { data: null, error: "Failed to fetch raffles" };
+    }
+
+    if (!raffles) {
+      return { data: [], error: null };
+    }
+
+    // 3. Get winner counts for all raffles in one query
+    const { data: winnerCounts, error: winnerCountsError } = await serviceClient
+      .from("winners")
+      .select("raffle_id");
+
+    if (winnerCountsError) {
+      console.error("Database error fetching winner counts:", winnerCountsError);
+      // Continue without winner counts
+    }
+
+    // 4. Count winners per raffle
+    const winnerCountMap = new Map<string, number>();
+    if (winnerCounts) {
+      for (const winner of winnerCounts) {
+        const current = winnerCountMap.get(winner.raffle_id) || 0;
+        winnerCountMap.set(winner.raffle_id, current + 1);
+      }
+    }
+
+    // 5. Combine raffles with winner counts
+    const rafflesWithCounts: RaffleWithWinnerCount[] = raffles.map((raffle) => ({
+      ...(raffle as Raffle),
+      winner_count: winnerCountMap.get(raffle.id) || 0,
+    }));
+
+    return { data: rafflesWithCounts, error: null };
+  } catch (e) {
+    console.error("Unexpected error fetching raffles with winner count:", e);
+    return { data: null, error: "Failed to fetch raffles" };
+  }
+}
+
 export async function regenerateQrCode(
   raffleId: string,
   durationMinutes: number

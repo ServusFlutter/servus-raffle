@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getRaffles } from "@/lib/actions/raffles";
+import { getRafflesWithWinnerCount, type RaffleWithWinnerCount } from "@/lib/actions/raffles";
 import {
   Card,
   CardContent,
@@ -9,14 +9,14 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { History, PlusCircle } from "lucide-react";
-import type { Raffle } from "@/lib/schemas/raffle";
+import { History, PlusCircle, Trophy } from "lucide-react";
 import { formatDate, getStatusVariant } from "@/lib/utils/raffle";
 
 /**
  * Raffle list item component
+ * Story 6.7: Added winner count display for completed raffles
  */
-function RaffleListItem({ raffle }: { raffle: Raffle }) {
+function RaffleListItem({ raffle }: { raffle: RaffleWithWinnerCount }) {
   return (
     <Link href={`/admin/raffles/${raffle.id}`}>
       <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
@@ -27,6 +27,17 @@ function RaffleListItem({ raffle }: { raffle: Raffle }) {
               <Badge variant={getStatusVariant(raffle.status)}>
                 {raffle.status}
               </Badge>
+              {/* Story 6.7 AC #6: Winner count badge for completed raffles */}
+              {raffle.status === "completed" && raffle.winner_count > 0 && (
+                <Badge
+                  variant="outline"
+                  className="text-yellow-600 border-yellow-600"
+                  data-testid="winner-count-badge"
+                >
+                  <Trophy className="h-3 w-3 mr-1" />
+                  {raffle.winner_count} {raffle.winner_count === 1 ? "Winner" : "Winners"}
+                </Badge>
+              )}
             </div>
             <CardDescription>{formatDate(raffle.created_at)}</CardDescription>
           </div>
@@ -58,7 +69,7 @@ function EmptyRaffleState() {
 }
 
 export default async function AdminDashboard() {
-  const { data: raffles, error } = await getRaffles();
+  const { data: raffles, error } = await getRafflesWithWinnerCount();
 
   return (
     <div className="container mx-auto max-w-4xl">

@@ -13,6 +13,7 @@ const mockRaffles = [
     qr_code_expires_at: null,
     created_at: "2024-12-25T10:00:00Z",
     created_by: "admin-1",
+    winner_count: 0,
   },
   {
     id: "raffle-2",
@@ -21,12 +22,13 @@ const mockRaffles = [
     qr_code_expires_at: null,
     created_at: "2024-11-28T10:00:00Z",
     created_by: "admin-1",
+    winner_count: 3,
   },
 ];
 
 jest.mock("@/lib/actions/raffles", () => ({
   __esModule: true,
-  getRaffles: jest.fn().mockResolvedValue({
+  getRafflesWithWinnerCount: jest.fn().mockResolvedValue({
     data: [],
     error: null,
   }),
@@ -34,7 +36,7 @@ jest.mock("@/lib/actions/raffles", () => ({
 
 // Need to import after mocking
 import AdminDashboard from "./page";
-import { getRaffles } from "@/lib/actions/raffles";
+import { getRafflesWithWinnerCount } from "@/lib/actions/raffles";
 
 describe("AdminDashboard", () => {
   beforeEach(() => {
@@ -43,7 +45,7 @@ describe("AdminDashboard", () => {
 
   describe("with empty raffle list", () => {
     beforeEach(() => {
-      (getRaffles as jest.Mock).mockResolvedValue({
+      (getRafflesWithWinnerCount as jest.Mock).mockResolvedValue({
         data: [],
         error: null,
       });
@@ -102,7 +104,7 @@ describe("AdminDashboard", () => {
 
   describe("with raffles", () => {
     beforeEach(() => {
-      (getRaffles as jest.Mock).mockResolvedValue({
+      (getRafflesWithWinnerCount as jest.Mock).mockResolvedValue({
         data: mockRaffles,
         error: null,
       });
@@ -145,11 +147,20 @@ describe("AdminDashboard", () => {
       expect(screen.getByText("2")).toBeInTheDocument(); // Total
       expect(screen.getByText("1")).toBeInTheDocument(); // Completed
     });
+
+    it("displays winner count badge for completed raffles (Story 6.7)", async () => {
+      const Page = await AdminDashboard();
+      render(Page);
+
+      // Winner count badge should be visible for completed raffle with 3 winners
+      expect(screen.getByTestId("winner-count-badge")).toBeInTheDocument();
+      expect(screen.getByText("3 Winners")).toBeInTheDocument();
+    });
   });
 
   describe("with error", () => {
     beforeEach(() => {
-      (getRaffles as jest.Mock).mockResolvedValue({
+      (getRafflesWithWinnerCount as jest.Mock).mockResolvedValue({
         data: null,
         error: "Failed to fetch raffles",
       });
@@ -166,7 +177,7 @@ describe("AdminDashboard", () => {
 
 describe("AdminDashboard Accessibility", () => {
   beforeEach(() => {
-    (getRaffles as jest.Mock).mockResolvedValue({
+    (getRafflesWithWinnerCount as jest.Mock).mockResolvedValue({
       data: [],
       error: null,
     });

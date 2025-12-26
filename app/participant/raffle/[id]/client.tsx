@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { TicketCircle, getTicketMessage } from "@/components/raffle/ticketCircle";
 import { StatusBar } from "@/components/raffle/statusBar";
@@ -95,6 +95,7 @@ export function ParticipantRaffleClient({
   // State for draw events (Story 6.2 AC #1, #2)
   // Story 6.4: Added wheel animation states
   // Story 6.5: Added winner celebration states
+  // Story 6.7: Added raffle ended state
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [currentDrawPrize, setCurrentDrawPrize] = useState<string | null>(null);
   const [wheelSeed, setWheelSeed] = useState<number | null>(null);
@@ -106,6 +107,9 @@ export function ParticipantRaffleClient({
     ticketsAtWin: number;
     prizeName: string;
   } | null>(null);
+  // Story 6.7: Raffle ended state for thank-you overlay
+  const [raffleEnded, setRaffleEnded] = useState(false);
+  const [finalWinnerCount, setFinalWinnerCount] = useState(0);
 
   // Broadcast event handlers (Story 6.2)
   // Story 6.4: Updated to control wheel animation
@@ -166,6 +170,9 @@ export function ParticipantRaffleClient({
       setWheelSeed(null);
       setRevealedWinner(null);
       setShowCelebration(false);
+      // Story 6.7: Show thank-you overlay
+      setRaffleEnded(true);
+      setFinalWinnerCount(event.payload.totalPrizesAwarded);
       // Refresh to get final raffle state
       router.refresh();
     },
@@ -351,6 +358,30 @@ export function ParticipantRaffleClient({
           currentUserTicketCount={ticketCount}
           onCelebrationComplete={handleCelebrationComplete}
         />
+      )}
+
+      {/* Story 6.7: Thank-you overlay when raffle ends (AC #4) */}
+      {raffleEnded && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center"
+          role="dialog"
+          aria-label="Raffle Complete"
+          data-testid="thank-you-overlay"
+        >
+          <Trophy className="h-24 w-24 text-yellow-400 mb-6 animate-bounce" />
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            Raffle Complete!
+          </h2>
+          <p
+            className="text-xl text-white/80 mb-2"
+            aria-live="polite"
+          >
+            Thanks for participating!
+          </p>
+          <p className="text-lg text-white/60">
+            {finalWinnerCount} {finalWinnerCount === 1 ? "prize" : "prizes"} awarded
+          </p>
+        </div>
       )}
     </div>
   );

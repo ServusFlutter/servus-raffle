@@ -22,9 +22,19 @@ import {
   broadcastDrawStart,
   broadcastWheelSeed,
   broadcastWinnerRevealed,
+  broadcastRaffleEnded,
 } from "@/lib/supabase/broadcast";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  selectWeightedWinner,
+  calculateAccumulatedTicketsForUser,
+  type EligibleParticipant,
+} from "@/lib/utils/draw";
+
+// Re-export for backwards compatibility with tests
+export { selectWeightedWinner, calculateAccumulatedTicketsForUser };
+export type { EligibleParticipant };
 
 /**
  * ActionResult type for consistent Server Action responses
@@ -33,15 +43,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 type ActionResult<T> = {
   data: T | null;
   error: string | null;
-};
-
-/**
- * Eligible participant with accumulated tickets for weighted selection
- */
-export type EligibleParticipant = {
-  userId: string;
-  name: string;
-  tickets: number;
 };
 
 /**
@@ -83,61 +84,6 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Select winner using weighted random selection
- *
- * Each ticket gives one "entry" in the pool.
- * A participant with 5 tickets has 5x the chance of someone with 1 ticket.
- *
- * @param participants - Array of eligible participants with ticket counts
- * @param seed - Optional seed for deterministic selection (for testing)
- * @returns Selected participant or null if no eligible participants
- *
- * @example
- * // Alice has 5 tickets, Bob has 2 tickets
- * // Pool: [Alice x5, Bob x2] = 7 entries
- * // Alice has 5/7 (71%) chance, Bob has 2/7 (29%) chance
- */
-export function selectWeightedWinner(
-  participants: EligibleParticipant[],
-  seed?: number
-): EligibleParticipant | null {
-  if (participants.length === 0) {
-    return null;
-  }
-
-  // Calculate total tickets
-  const totalTickets = participants.reduce((sum, p) => sum + p.tickets, 0);
-
-  if (totalTickets === 0) {
-    return null;
-  }
-
-  // Generate random value
-  // Use seeded random for testing, Math.random() for production
-  let randomValue: number;
-  if (seed !== undefined) {
-    // Simple seeded random for deterministic testing
-    // Using a basic linear congruential generator
-    const lcgRandom = (seed % 2147483647) / 2147483647;
-    randomValue = Math.floor(lcgRandom * totalTickets);
-  } else {
-    randomValue = Math.floor(Math.random() * totalTickets);
-  }
-
-  // Select winner based on weighted position
-  let cumulative = 0;
-  for (const participant of participants) {
-    cumulative += participant.tickets;
-    if (randomValue < cumulative) {
-      return participant;
-    }
-  }
-
-  // Fallback (should never reach due to math)
-  return participants[participants.length - 1];
-}
-
-/**
  * Generate a cryptographically secure random seed for wheel animation
  *
  * The seed ensures identical animation on all connected devices.
@@ -154,65 +100,6 @@ function generateWheelSeed(): number {
   }
   // Fallback to Math.random
   return Math.floor(Math.random() * 1000000);
-}
-
-/**
- * Calculate accumulated tickets for a user
- *
- * Sums tickets from all raffles the user participated in,
- * but only counts tickets earned AFTER their last win (if any).
- * This implements the "tickets reset after winning" behavior.
- *
- * **Story 6.6: Implicit Ticket Reset Mechanism**
- * The ticket reset is NOT done by physically deleting or modifying participant records.
- * Instead, it works implicitly through timestamp comparison:
- * 1. drawWinner() creates a `winners` table record with `won_at` timestamp
- * 2. This function queries: tickets WHERE joined_at > last_win_timestamp
- * 3. Since the winner record has a `won_at` time, all participations BEFORE that time
- *    are automatically excluded from the accumulated count
- *
- * This approach ensures:
- * - AC #1 (FR9): Atomic ticket reset as part of draw transaction
- * - AC #2: All previous tickets are cleared (excluded from count)
- * - No data loss - historical participation records are preserved
- *
- * @param adminClient - Supabase client with service role
- * @param userId - UUID of the user
- * @returns Total accumulated ticket count
- */
-export async function calculateAccumulatedTicketsForUser(
-  adminClient: SupabaseClient,
-  userId: string
-): Promise<number> {
-  // Step 1: Find user's last win timestamp
-  const { data: lastWin } = await adminClient
-    .from("winners")
-    .select("won_at")
-    .eq("user_id", userId)
-    .order("won_at", { ascending: false })
-    .limit(1)
-    .single();
-
-  // Step 2: Build query for accumulated tickets
-  let query = adminClient
-    .from("participants")
-    .select("ticket_count")
-    .eq("user_id", userId);
-
-  // Step 3: If user has won before, only count tickets after last win
-  if (lastWin?.won_at) {
-    query = query.gt("joined_at", lastWin.won_at);
-  }
-
-  const { data: participations, error } = await query;
-
-  if (error || !participations) {
-    console.error("Error calculating accumulated tickets:", error);
-    return 0;
-  }
-
-  // Sum all ticket counts
-  return participations.reduce((sum, p) => sum + (p.ticket_count || 0), 0);
 }
 
 /**
@@ -539,12 +426,19 @@ export async function drawWinner(
       console.warn("Failed to broadcast WINNER_REVEALED:", winnerRevealResult.error);
     }
 
-    // 14. Revalidate paths
+    // 14. Story 6.7: Check if all prizes awarded and complete raffle
+    const raffleCompleted = await checkAndCompleteRaffle(adminClient, raffleId);
+    if (raffleCompleted) {
+      console.log(`[Draw] Raffle ${raffleId} completed - all prizes awarded`);
+    }
+
+    // 15. Revalidate paths
     revalidatePath(`/admin/raffles/${raffleId}`);
     revalidatePath(`/admin/raffles/${raffleId}/draw`);
+    revalidatePath(`/admin/raffles/${raffleId}/live`);
     revalidatePath(`/projection/${raffleId}`);
 
-    // 15. Return successful result
+    // 16. Return successful result
     const result: DrawWinnerResult = {
       winner: {
         id: winnerRecord.id,
@@ -569,6 +463,61 @@ export async function drawWinner(
     console.error("Unexpected error in drawWinner:", e);
     return { data: null, error: "Failed to draw winner" };
   }
+}
+
+/**
+ * Check if all prizes are awarded and complete the raffle
+ *
+ * Story 6.7: After each draw, check if all prizes have been awarded.
+ * If so, update raffle status to 'completed' and broadcast RAFFLE_ENDED.
+ *
+ * @param adminClient - Supabase client with service role
+ * @param raffleId - UUID of the raffle
+ * @returns True if raffle was completed, false otherwise
+ */
+async function checkAndCompleteRaffle(
+  adminClient: SupabaseClient,
+  raffleId: string
+): Promise<boolean> {
+  // Get all prizes for this raffle
+  const { data: prizes, error: prizesError } = await adminClient
+    .from("prizes")
+    .select("id, awarded_to")
+    .eq("raffle_id", raffleId);
+
+  if (prizesError || !prizes || prizes.length === 0) {
+    console.error("[Draw] Error checking prizes for completion:", prizesError);
+    return false;
+  }
+
+  // Check if all prizes are awarded
+  const allAwarded = prizes.every((p) => p.awarded_to !== null);
+
+  if (allAwarded) {
+    console.log(`[Draw] All ${prizes.length} prizes awarded, completing raffle`);
+
+    // Update raffle status to completed
+    const { error: updateError } = await adminClient
+      .from("raffles")
+      .update({ status: "completed" })
+      .eq("id", raffleId);
+
+    if (updateError) {
+      console.error("[Draw] Error updating raffle status to completed:", updateError);
+      return false;
+    }
+
+    // Broadcast RAFFLE_ENDED event
+    const broadcastResult = await broadcastRaffleEnded(raffleId, prizes.length);
+    if (!broadcastResult.success) {
+      console.warn("[Draw] Failed to broadcast RAFFLE_ENDED:", broadcastResult.error);
+      // Don't return false - raffle is still completed even if broadcast fails
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 /**
