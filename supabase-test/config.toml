@@ -1,0 +1,115 @@
+# Servus Raffle - Test Supabase Configuration
+# Port: 54421 (API), 54422 (DB), 54423 (Studio)
+# Offset +100 from dev to avoid conflicts
+
+project_id = "servus-raffle-test"
+
+[api]
+enabled = true
+port = 54421
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[api.tls]
+enabled = false
+
+[db]
+port = 54422
+shadow_port = 20122
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54429
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+ip_version = "IPv4"
+max_header_length = 4096
+
+[studio]
+enabled = true
+port = 54423
+api_url = "http://127.0.0.1"
+openai_api_key = ""
+
+[inbucket]
+enabled = true
+port = 54424
+smtp_port = 54425
+pop3_port = 54426
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[storage.image_transformation]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+minimum_password_length = 6
+password_requirements = ""
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = false
+enable_confirmations = false
+secure_password_change = false
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+template = "Your code is {{ .Code }}"
+max_frequency = "5s"
+
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = false
+verify_enabled = false
+
+[auth.mfa.phone]
+enroll_enabled = false
+verify_enabled = false
+
+[auth.mfa.web_authn]
+enroll_enabled = false
+verify_enabled = false
+
+[auth.sessions]
+timebox = "24h"
+inactivity_timeout = "8h"
+
+[auth.hook.custom_access_token]
+enabled = false
+
+[analytics]
+enabled = false
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
+inspector_port = 8183
+
+[experimental]
+orioledb_version = ""
+s3_host = ""
+s3_region = "us-east-1"
+s3_access_key = ""
+s3_secret_key = ""

@@ -1,7 +1,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 
-const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
+// Test Supabase runs on port 54421 (offset +100 from dev)
+const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54421'
 
 /**
  * Service role client - bypasses RLS for setup/teardown
@@ -10,7 +11,9 @@ const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
 export function createServiceRoleClient(): SupabaseClient<Database> {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!serviceKey) {
-    throw new Error('SUPABASE_SERVICE_ROLE_KEY not set. Run `bunx supabase status` to get it.')
+    throw new Error(
+      'SUPABASE_SERVICE_ROLE_KEY not set. Run `bunx supabase --workdir supabase-test status` to get it.'
+    )
   }
 
   return createClient<Database>(SUPABASE_URL, serviceKey, {
@@ -25,7 +28,9 @@ export function createServiceRoleClient(): SupabaseClient<Database> {
 export function createAnonClient(): SupabaseClient<Database> {
   const anonKey = process.env.SUPABASE_ANON_KEY
   if (!anonKey) {
-    throw new Error('SUPABASE_ANON_KEY not set. Run `bunx supabase status` to get it.')
+    throw new Error(
+      'SUPABASE_ANON_KEY not set. Run `bunx supabase --workdir supabase-test status` to get it.'
+    )
   }
 
   return createClient<Database>(SUPABASE_URL, anonKey, {
@@ -53,10 +58,12 @@ export const TEST_IDS = {
   PRIZE_2: 'pppp2222-2222-2222-2222-222222222222',
 } as const
 
+type TableName = 'profiles' | 'raffles' | 'participants' | 'prizes' | 'winners'
+
 /**
  * Helper to clean up test data between tests
  */
-export async function cleanupTestData(tables: string[] = []) {
+export async function cleanupTestData(tables: TableName[] = []) {
   const client = createServiceRoleClient()
 
   for (const table of tables) {

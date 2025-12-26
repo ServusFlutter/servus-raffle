@@ -29,12 +29,11 @@ export default defineConfig({
     testTimeout: 30000,
     hookTimeout: 30000,
 
-    // Environment variables for local Supabase
+    // Environment variables for Test Supabase (port 54421)
     env: {
-      SUPABASE_URL: 'http://127.0.0.1:54321',
-      // These will be read from supabase status output
-      // SUPABASE_ANON_KEY: '...',
-      // SUPABASE_SERVICE_ROLE_KEY: '...',
+      SUPABASE_URL: 'http://127.0.0.1:54421',
+      // Keys will be extracted from `bunx supabase --workdir supabase-test status`
+      // by the globalSetup script
     },
   },
   resolve: {
