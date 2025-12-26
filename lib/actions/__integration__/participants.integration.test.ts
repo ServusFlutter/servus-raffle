@@ -16,13 +16,9 @@ import { createClient } from "@supabase/supabase-js";
 
 // Declare global test utilities from jest.integration.setup.js
 declare global {
-  // eslint-disable-next-line no-var
   var TEST_PASSWORD: string;
-  // eslint-disable-next-line no-var
   var TEST_RAFFLE_ACTIVE_ID: string;
-  // eslint-disable-next-line no-var
   var TEST_RAFFLE_DRAFT_ID: string;
-  // eslint-disable-next-line no-var
   var TEST_RAFFLE_COMPLETED_ID: string;
 }
 

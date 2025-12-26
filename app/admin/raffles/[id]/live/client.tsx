@@ -1,9 +1,20 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { X, Users, Ticket, Trophy, Gift } from "lucide-react";
+import { X, Users, Ticket, Trophy, Gift, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useBroadcastChannel } from "@/lib/supabase/useBroadcastChannel";
+import { subscribeToParticipantChanges } from "@/lib/supabase/realtime";
 import type { PrizeWithWinner } from "@/lib/actions/prizes";
+import type {
+  BroadcastEvent,
+  DrawStartPayload,
+  WheelSeedPayload,
+  WinnerRevealedPayload,
+  RaffleEndedPayload,
+} from "@/lib/constants/events";
 
 interface LiveDrawClientProps {
   raffleId: string;
@@ -29,8 +40,11 @@ interface LiveDrawClientProps {
  * - Large "Draw Winner" button (placeholder until Story 6.3)
  * - Participant count and prize progress display
  * - Discrete exit button in top-right corner
+ * - Real-time broadcast subscription for synchronized draws (Story 6.2)
+ * - Real-time participant count updates (Story 6.2 AC #4)
  *
  * Story 6.1: Admin Live Draw Mode & Projection UI
+ * Story 6.2: Real-time Channel Setup & Synchronization
  */
 export function LiveDrawClient({
   raffleId,
@@ -40,10 +54,121 @@ export function LiveDrawClient({
   currentPrizeIndex,
   totalPrizes,
   awardedCount,
-  participantCount,
-  totalTickets,
+  participantCount: initialParticipantCount,
+  totalTickets: initialTotalTickets,
   prizes,
 }: LiveDrawClientProps) {
+  const router = useRouter();
+
+  // Real-time participant count state (Story 6.2 AC #4)
+  const [liveParticipantCount, setLiveParticipantCount] = useState(initialParticipantCount);
+  const [liveTotalTickets, setLiveTotalTickets] = useState(initialTotalTickets);
+
+  // State for draw events (Story 6.2)
+  // TODO(Story 6.3): Use drawInProgress to toggle draw button state
+  // TODO(Story 6.4): Use currentDrawPrize and wheelSeed for wheel animation
+  // TODO(Story 6.5): Use revealedWinner for winner celebration display
+  // These states are intentionally set but not yet rendered - they will be used in upcoming stories
+  const [drawInProgress, setDrawInProgress] = useState(false);
+  const [currentDrawPrize, setCurrentDrawPrize] = useState<string | null>(null);
+  const [wheelSeed, setWheelSeed] = useState<number | null>(null);
+  const [revealedWinner, setRevealedWinner] = useState<{
+    winnerId: string;
+    winnerName: string;
+  } | null>(null);
+
+  // Suppress unused variable warnings - these are intentional placeholders for Story 6.3/6.4/6.5
+  void drawInProgress;
+  void currentDrawPrize;
+  void wheelSeed;
+  void revealedWinner;
+
+  // Broadcast event handlers (Story 6.2)
+  const handleDrawStart = useCallback(
+    (event: BroadcastEvent<DrawStartPayload>) => {
+      console.log("[LiveDraw] Draw started for prize:", event.payload.prizeName);
+      setDrawInProgress(true);
+      setCurrentDrawPrize(event.payload.prizeName);
+      setWheelSeed(null);
+      setRevealedWinner(null);
+    },
+    []
+  );
+
+  const handleWheelSeed = useCallback(
+    (event: BroadcastEvent<WheelSeedPayload>) => {
+      console.log("[LiveDraw] Wheel seed received:", event.payload.seed);
+      setWheelSeed(event.payload.seed);
+    },
+    []
+  );
+
+  const handleWinnerRevealed = useCallback(
+    (event: BroadcastEvent<WinnerRevealedPayload>) => {
+      console.log("[LiveDraw] Winner revealed:", event.payload.winnerName);
+      setRevealedWinner({
+        winnerId: event.payload.winnerId,
+        winnerName: event.payload.winnerName,
+      });
+      setDrawInProgress(false);
+      // Refresh to get updated prize data
+      router.refresh();
+    },
+    [router]
+  );
+
+  const handleRaffleEnded = useCallback(
+    (event: BroadcastEvent<RaffleEndedPayload>) => {
+      console.log("[LiveDraw] Raffle ended, prizes awarded:", event.payload.totalPrizesAwarded);
+      setDrawInProgress(false);
+      setCurrentDrawPrize(null);
+      setWheelSeed(null);
+      setRevealedWinner(null);
+      // Refresh to get final raffle state
+      router.refresh();
+    },
+    [router]
+  );
+
+  const handleReconnect = useCallback(() => {
+    console.log("[LiveDraw] Reconnecting - fetching current state");
+    // On reconnect, refresh to get current state (Story 6.2 AC #5)
+    router.refresh();
+  }, [router]);
+
+  // Subscribe to broadcast channel for draw events (Story 6.2 AC #1, #2)
+  const { connectionState, isConnected, reconnect } = useBroadcastChannel(raffleId, {
+    onDrawStart: handleDrawStart,
+    onWheelSeed: handleWheelSeed,
+    onWinnerRevealed: handleWinnerRevealed,
+    onRaffleEnded: handleRaffleEnded,
+    onReconnect: handleReconnect,
+  });
+
+  // Subscribe to participant changes for real-time count (Story 6.2 AC #4)
+  useEffect(() => {
+    const channel = subscribeToParticipantChanges(raffleId, () => {
+      console.log("[LiveDraw] Participant change detected, refreshing data");
+      // Refresh to get updated participant count
+      router.refresh();
+    });
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [raffleId, router]);
+
+  // Update local state when props change (from router.refresh())
+  useEffect(() => {
+    setLiveParticipantCount(initialParticipantCount);
+    setLiveTotalTickets(initialTotalTickets);
+  }, [initialParticipantCount, initialTotalTickets]);
+
+  // Log connection state for debugging
+  useEffect(() => {
+    console.log(`[LiveDraw] Broadcast connection state: ${connectionState}`);
+  }, [connectionState]);
+
   // _raffleStatus is available for Story 6.3 when we implement:
   // - Different button states based on status (drawing vs active)
   // - Status transition handling
@@ -69,6 +194,28 @@ export function LiveDrawClient({
             <X className="h-6 w-6" />
           </Button>
         </Link>
+      </div>
+
+      {/* Connection Status Indicator - Subtle, top-left (Story 6.2) */}
+      <div
+        className="absolute top-4 left-4 z-50 flex items-center gap-2"
+        data-testid="connection-indicator"
+      >
+        {isConnected ? (
+          <Wifi
+            className="h-5 w-5 text-green-500/60"
+            aria-label="Real-time connection active"
+          />
+        ) : (
+          <button
+            onClick={reconnect}
+            className="flex items-center gap-2 text-yellow-500/80 hover:text-yellow-400 transition-colors"
+            aria-label="Reconnect to real-time channel"
+          >
+            <WifiOff className="h-5 w-5" />
+            <span className="text-sm">Reconnect</span>
+          </button>
+        )}
       </div>
 
       {/* Main Content - Centered for projection */}
@@ -178,7 +325,7 @@ export function LiveDrawClient({
           className="mt-16 flex items-center gap-12 text-white/60"
           data-testid="participant-stats"
           role="status"
-          aria-label={`${participantCount} participants with ${totalTickets} total tickets`}
+          aria-label={`${liveParticipantCount} participants with ${liveTotalTickets} total tickets`}
         >
           <div className="flex items-center gap-3">
             <Users className="h-8 w-8 md:h-10 md:w-10" />
@@ -186,10 +333,10 @@ export function LiveDrawClient({
               className="text-3xl md:text-4xl font-semibold"
               data-testid="participant-count"
             >
-              {participantCount}
+              {liveParticipantCount}
             </span>
             <span className="text-xl md:text-2xl">
-              {participantCount === 1 ? "Participant" : "Participants"}
+              {liveParticipantCount === 1 ? "Participant" : "Participants"}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -198,10 +345,10 @@ export function LiveDrawClient({
               className="text-3xl md:text-4xl font-semibold"
               data-testid="ticket-count"
             >
-              {totalTickets}
+              {liveTotalTickets}
             </span>
             <span className="text-xl md:text-2xl">
-              {totalTickets === 1 ? "Ticket" : "Tickets"}
+              {liveTotalTickets === 1 ? "Ticket" : "Tickets"}
             </span>
           </div>
         </div>

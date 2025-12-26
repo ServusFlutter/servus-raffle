@@ -15,6 +15,34 @@ jest.mock("next/link", () => {
   };
 });
 
+// Mock next/navigation
+const mockPush = jest.fn();
+const mockReplace = jest.fn();
+const mockRefresh = jest.fn();
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    refresh: mockRefresh,
+  }),
+}));
+
+// Mock broadcast channel hook (Story 6.2)
+jest.mock("@/lib/supabase/useBroadcastChannel", () => ({
+  useBroadcastChannel: jest.fn(() => ({
+    connectionState: "connected",
+    isConnected: true,
+    reconnect: jest.fn(),
+  })),
+}));
+
+// Mock realtime subscriptions (Story 6.2 AC #4)
+jest.mock("@/lib/supabase/realtime", () => ({
+  subscribeToParticipantChanges: jest.fn(() => ({
+    unsubscribe: jest.fn(),
+  })),
+}));
+
 describe("LiveDrawClient", () => {
   const mockPrizes: PrizeWithWinner[] = [
     {
@@ -414,6 +442,96 @@ describe("LiveDrawClient", () => {
       render(<LiveDrawClient {...propsWithNoPrizes} />);
 
       expect(screen.queryByTestId("prize-summary")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Broadcast Channel Subscription (Story 6.2)", () => {
+    it("subscribes to broadcast channel with raffleId", () => {
+      const { useBroadcastChannel } = jest.requireMock(
+        "@/lib/supabase/useBroadcastChannel"
+      );
+
+      render(<LiveDrawClient {...defaultProps} />);
+
+      expect(useBroadcastChannel).toHaveBeenCalledWith(
+        defaultProps.raffleId,
+        expect.objectContaining({
+          onDrawStart: expect.any(Function),
+          onWheelSeed: expect.any(Function),
+          onWinnerRevealed: expect.any(Function),
+          onRaffleEnded: expect.any(Function),
+          onReconnect: expect.any(Function),
+        })
+      );
+    });
+
+    it("shows connection indicator when connected", () => {
+      const { useBroadcastChannel } = jest.requireMock(
+        "@/lib/supabase/useBroadcastChannel"
+      );
+      useBroadcastChannel.mockReturnValue({
+        connectionState: "connected",
+        isConnected: true,
+        reconnect: jest.fn(),
+      });
+
+      render(<LiveDrawClient {...defaultProps} />);
+
+      const connectionIndicator = screen.getByTestId("connection-indicator");
+      expect(connectionIndicator).toBeInTheDocument();
+      // Should show wifi icon when connected
+      expect(
+        connectionIndicator.querySelector('[aria-label="Real-time connection active"]')
+      ).toBeInTheDocument();
+    });
+
+    it("shows reconnect button when disconnected", () => {
+      const { useBroadcastChannel } = jest.requireMock(
+        "@/lib/supabase/useBroadcastChannel"
+      );
+      useBroadcastChannel.mockReturnValue({
+        connectionState: "disconnected",
+        isConnected: false,
+        reconnect: jest.fn(),
+      });
+
+      render(<LiveDrawClient {...defaultProps} />);
+
+      const connectionIndicator = screen.getByTestId("connection-indicator");
+      expect(connectionIndicator).toBeInTheDocument();
+      // Should show reconnect button when disconnected
+      expect(
+        screen.getByRole("button", { name: /reconnect/i })
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("Real-time Participant Count (Story 6.2 AC #4)", () => {
+    it("subscribes to participant changes", () => {
+      const { subscribeToParticipantChanges } = jest.requireMock(
+        "@/lib/supabase/realtime"
+      );
+
+      render(<LiveDrawClient {...defaultProps} />);
+
+      expect(subscribeToParticipantChanges).toHaveBeenCalledWith(
+        defaultProps.raffleId,
+        expect.any(Function)
+      );
+    });
+
+    it("displays initial participant count", () => {
+      render(<LiveDrawClient {...defaultProps} />);
+
+      const participantCount = screen.getByTestId("participant-count");
+      expect(participantCount).toHaveTextContent("42");
+    });
+
+    it("displays initial ticket count", () => {
+      render(<LiveDrawClient {...defaultProps} />);
+
+      const ticketCount = screen.getByTestId("ticket-count");
+      expect(ticketCount).toHaveTextContent("156");
     });
   });
 });

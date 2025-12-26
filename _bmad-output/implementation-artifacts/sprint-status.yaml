@@ -81,7 +81,7 @@ development_status:
   # Epic 6: Live Draw Experience
   epic-6: in-progress
   6-1-admin-live-draw-mode-and-projection-ui: done
-  6-2-real-time-channel-setup-and-synchronization: backlog
+  6-2-real-time-channel-setup-and-synchronization: done
   6-3-draw-winner-server-action: backlog
   6-4-wheel-of-fortune-animation: backlog
   6-5-winner-celebration-and-announcement: backlog

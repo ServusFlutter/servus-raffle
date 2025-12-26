@@ -33,6 +33,15 @@ jest.mock("@/lib/supabase/realtime", () => ({
   })),
 }));
 
+// Mock broadcast channel hook (Story 6.2)
+jest.mock("@/lib/supabase/useBroadcastChannel", () => ({
+  useBroadcastChannel: jest.fn(() => ({
+    connectionState: "connected",
+    isConnected: true,
+    reconnect: jest.fn(),
+  })),
+}));
+
 const mockToast = toast as jest.Mocked<typeof toast>;
 
 describe("ParticipantRaffleClient", () => {
@@ -416,6 +425,43 @@ describe("ParticipantRaffleClient", () => {
 
       const announcement = screen.getByTestId("screen-reader-announcement");
       expect(announcement).toHaveTextContent("");
+    });
+  });
+
+  describe("Broadcast Channel Subscription (Story 6.2)", () => {
+    it("subscribes to broadcast channel with raffleId", () => {
+      const { useBroadcastChannel } = jest.requireMock(
+        "@/lib/supabase/useBroadcastChannel"
+      );
+
+      render(<ParticipantRaffleClient {...defaultProps} />);
+
+      expect(useBroadcastChannel).toHaveBeenCalledWith(
+        defaultProps.raffleId,
+        expect.objectContaining({
+          onDrawStart: expect.any(Function),
+          onWheelSeed: expect.any(Function),
+          onWinnerRevealed: expect.any(Function),
+          onRaffleEnded: expect.any(Function),
+          onReconnect: expect.any(Function),
+        })
+      );
+    });
+
+    it("handles broadcast channel connection state", () => {
+      const { useBroadcastChannel } = jest.requireMock(
+        "@/lib/supabase/useBroadcastChannel"
+      );
+      useBroadcastChannel.mockReturnValue({
+        connectionState: "connected",
+        isConnected: true,
+        reconnect: jest.fn(),
+      });
+
+      render(<ParticipantRaffleClient {...defaultProps} />);
+
+      // Component should render without errors when connected
+      expect(screen.getByTestId("ticket-circle")).toBeInTheDocument();
     });
   });
 });

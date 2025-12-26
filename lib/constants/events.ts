@@ -74,3 +74,21 @@ export type RaffleEndedPayload = {
   raffleId: string;
   totalPrizesAwarded: number;
 };
+
+/**
+ * Generate the broadcast channel name for a raffle
+ *
+ * Pattern: raffle:{id}:draw
+ *
+ * @param raffleId - UUID of the raffle
+ * @returns Channel name string
+ *
+ * @example
+ * ```typescript
+ * const channelName = getBroadcastChannelName("abc-123");
+ * // Returns: "raffle:abc-123:draw"
+ * ```
+ */
+export function getBroadcastChannelName(raffleId: string): string {
+  return `raffle:${raffleId}:draw`;
+}

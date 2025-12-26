@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,15 @@ import {
   subscribeToRaffleStatusChanges,
   subscribeToPrizeChanges,
 } from "@/lib/supabase/realtime";
+import { useBroadcastChannel } from "@/lib/supabase/useBroadcastChannel";
 import type { ParticipantPrize } from "@/lib/schemas/prize";
+import type {
+  BroadcastEvent,
+  DrawStartPayload,
+  WheelSeedPayload,
+  WinnerRevealedPayload,
+  RaffleEndedPayload,
+} from "@/lib/constants/events";
 
 // Type guard to validate raffle status
 function isValidRaffleStatus(status: string): status is RaffleStatus {
@@ -44,6 +52,8 @@ interface ParticipantRaffleClientProps {
 /**
  * Client component for participant raffle dashboard
  * Handles toast notifications and client-side interactions
+ *
+ * Story 6.2: Added broadcast channel subscription for draw events
  */
 export function ParticipantRaffleClient({
   raffleId,
@@ -62,6 +72,86 @@ export function ParticipantRaffleClient({
   // State for screen reader announcements (AC #5)
   const [screenReaderAnnouncement, setScreenReaderAnnouncement] =
     useState<string>("");
+
+  // State for draw events (Story 6.2 AC #1, #2)
+  // TODO(Story 6.4): Use currentDrawPrize and wheelSeed for wheel animation
+  // TODO(Story 6.5): Use revealedWinner for winner celebration display
+  // These states are intentionally set but not yet rendered - they will be used in upcoming stories
+  const [currentDrawPrize, setCurrentDrawPrize] = useState<string | null>(null);
+  const [wheelSeed, setWheelSeed] = useState<number | null>(null);
+  const [revealedWinner, setRevealedWinner] = useState<{
+    winnerId: string;
+    winnerName: string;
+  } | null>(null);
+
+  // Suppress unused variable warnings - these are intentional placeholders for Story 6.4/6.5
+  void currentDrawPrize;
+  void wheelSeed;
+  void revealedWinner;
+
+  // Broadcast event handlers (Story 6.2)
+  const handleDrawStart = useCallback(
+    (event: BroadcastEvent<DrawStartPayload>) => {
+      console.log("[Participant] Draw started for prize:", event.payload.prizeName);
+      setCurrentDrawPrize(event.payload.prizeName);
+      setWheelSeed(null);
+      setRevealedWinner(null);
+    },
+    []
+  );
+
+  const handleWheelSeed = useCallback(
+    (event: BroadcastEvent<WheelSeedPayload>) => {
+      console.log("[Participant] Wheel seed received:", event.payload.seed);
+      setWheelSeed(event.payload.seed);
+    },
+    []
+  );
+
+  const handleWinnerRevealed = useCallback(
+    (event: BroadcastEvent<WinnerRevealedPayload>) => {
+      console.log("[Participant] Winner revealed:", event.payload.winnerName);
+      setRevealedWinner({
+        winnerId: event.payload.winnerId,
+        winnerName: event.payload.winnerName,
+      });
+      // Refresh to get updated prize data
+      router.refresh();
+    },
+    [router]
+  );
+
+  const handleRaffleEnded = useCallback(
+    (event: BroadcastEvent<RaffleEndedPayload>) => {
+      console.log("[Participant] Raffle ended, prizes awarded:", event.payload.totalPrizesAwarded);
+      setCurrentDrawPrize(null);
+      setWheelSeed(null);
+      setRevealedWinner(null);
+      // Refresh to get final raffle state
+      router.refresh();
+    },
+    [router]
+  );
+
+  const handleReconnect = useCallback(() => {
+    console.log("[Participant] Reconnecting - fetching current state");
+    // On reconnect, refresh to get current state (Story 6.2 AC #5)
+    router.refresh();
+  }, [router]);
+
+  // Subscribe to broadcast channel for draw events (Story 6.2 AC #1, #2)
+  const { connectionState } = useBroadcastChannel(raffleId, {
+    onDrawStart: handleDrawStart,
+    onWheelSeed: handleWheelSeed,
+    onWinnerRevealed: handleWinnerRevealed,
+    onRaffleEnded: handleRaffleEnded,
+    onReconnect: handleReconnect,
+  });
+
+  // Log connection state for debugging
+  useEffect(() => {
+    console.log(`[Participant] Broadcast connection state: ${connectionState}`);
+  }, [connectionState]);
 
   // Show toast on first join (AC #1, #3, #4)
   useEffect(() => {
