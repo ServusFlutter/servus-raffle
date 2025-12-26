@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Plus, Gift } from "lucide-react";
@@ -14,8 +14,7 @@ import {
   createPrize,
   updatePrize,
   deletePrize,
-  movePrizeUp,
-  movePrizeDown,
+  reorderPrizes,
   type PrizeWithWinner,
 } from "@/lib/actions/prizes";
 import { getRaffle } from "@/lib/actions/raffles";
@@ -24,7 +23,8 @@ import type { Raffle } from "@/lib/schemas/raffle";
 
 /**
  * Prizes management page for a raffle
- * Allows admins to add, edit, and delete prizes
+ * Allows admins to add, edit, delete, and reorder prizes
+ * Uses optimistic updates for smooth drag-and-drop reordering
  */
 export default function PrizesPage() {
   const params = useParams<{ id: string }>();
@@ -34,6 +34,9 @@ export default function PrizesPage() {
   const [prizes, setPrizes] = useState<PrizeWithWinner[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Track pending reorder operations to prevent race conditions
+  const pendingReorderRef = useRef<AbortController | null>(null);
 
   // Dialog states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -163,52 +166,58 @@ export default function PrizesPage() {
   }
 
   /**
-   * Handle moving a prize up in the sort order
+   * Handle reordering prizes via drag-and-drop
+   * Uses optimistic updates for smooth UX - updates UI immediately,
+   * then syncs with server in background. Reverts on error.
    */
-  async function handleMoveUp(prize: PrizeWithWinner) {
-    setIsSubmitting(true);
-    try {
-      const result = await movePrizeUp(prize.id);
-
-      if (result.error) {
-        toast.error(result.error);
-        return;
-      }
-
-      if (result.data) {
-        // Reload to get winner names (movePrizeUp returns basic Prize[])
-        await loadData();
-        toast.success("Prize moved up");
-      }
-    } catch {
-      toast.error("Failed to move prize");
-    } finally {
-      setIsSubmitting(false);
+  async function handleReorder(newOrder: PrizeWithWinner[]) {
+    // Cancel any pending reorder operation
+    if (pendingReorderRef.current) {
+      pendingReorderRef.current.abort();
     }
-  }
 
-  /**
-   * Handle moving a prize down in the sort order
-   */
-  async function handleMoveDown(prize: PrizeWithWinner) {
-    setIsSubmitting(true);
+    // Store previous state for potential rollback
+    const previousPrizes = prizes;
+
+    // Optimistic update - update UI immediately
+    setPrizes(newOrder);
+
+    // Create new abort controller for this operation
+    const abortController = new AbortController();
+    pendingReorderRef.current = abortController;
+
     try {
-      const result = await movePrizeDown(prize.id);
+      // Extract prize IDs in new order
+      const prizeIds = newOrder.map((p) => p.id);
 
-      if (result.error) {
-        toast.error(result.error);
+      // Sync with server in background (no await blocking UI)
+      const result = await reorderPrizes(raffleId, prizeIds);
+
+      // Check if this operation was aborted
+      if (abortController.signal.aborted) {
         return;
       }
 
-      if (result.data) {
-        // Reload to get winner names (movePrizeDown returns basic Prize[])
-        await loadData();
-        toast.success("Prize moved down");
+      if (result.error) {
+        // Revert to previous state on error
+        setPrizes(previousPrizes);
+        toast.error(result.error);
       }
+      // Success - no need to update state, optimistic update already applied
     } catch {
-      toast.error("Failed to move prize");
+      // Check if this operation was aborted
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      // Revert to previous state on error
+      setPrizes(previousPrizes);
+      toast.error("Failed to save prize order");
     } finally {
-      setIsSubmitting(false);
+      // Clear the pending reference if this is still the active operation
+      if (pendingReorderRef.current === abortController) {
+        pendingReorderRef.current = null;
+      }
     }
   }
 
@@ -276,13 +285,12 @@ export default function PrizesPage() {
       {/* Prize status summary */}
       <PrizeStatusSummary prizes={prizes} />
 
-      {/* Prize list */}
+      {/* Prize list with drag-and-drop */}
       <PrizeList
         prizes={prizes}
         onEdit={handleEditClick}
         onDelete={handleDeleteClick}
-        onMoveUp={handleMoveUp}
-        onMoveDown={handleMoveDown}
+        onReorder={handleReorder}
         isLoading={isSubmitting}
         highlightNextToDraw={raffle.status === "active"}
       />

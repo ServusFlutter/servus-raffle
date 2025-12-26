@@ -1,6 +1,24 @@
 "use client";
 
-import { Pencil, Trash2, Trophy, Clock, ChevronUp, ChevronDown } from "lucide-react";
+import { useMemo } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Pencil, Trash2, Trophy, Clock, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,10 +29,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { Prize } from "@/lib/schemas/prize";
 import type { PrizeWithWinner } from "@/lib/actions/prizes";
 
-// Re-export the type for convenience
 export type { PrizeWithWinner };
 
 interface PrizeListProps {
@@ -24,10 +40,8 @@ interface PrizeListProps {
   onEdit: (prize: PrizeWithWinner) => void;
   /** Callback when delete button is clicked */
   onDelete: (prize: PrizeWithWinner) => void;
-  /** Callback when move up button is clicked */
-  onMoveUp?: (prize: PrizeWithWinner) => void;
-  /** Callback when move down button is clicked */
-  onMoveDown?: (prize: PrizeWithWinner) => void;
+  /** Callback when prizes are reordered via drag-and-drop */
+  onReorder?: (newOrder: PrizeWithWinner[]) => void;
   /** Whether any action is in progress */
   isLoading?: boolean;
   /** Whether to highlight the next prize to be drawn */
@@ -35,25 +49,198 @@ interface PrizeListProps {
 }
 
 /**
- * Displays a list of prizes for a raffle
+ * Individual sortable prize card component
+ */
+function SortablePrizeCard({
+  prize,
+  index,
+  isAwarded,
+  isNextToDraw,
+  onEdit,
+  onDelete,
+  isLoading,
+  canDrag,
+}: {
+  prize: PrizeWithWinner;
+  index: number;
+  isAwarded: boolean;
+  isNextToDraw: boolean;
+  onEdit: (prize: PrizeWithWinner) => void;
+  onDelete: (prize: PrizeWithWinner) => void;
+  isLoading: boolean;
+  canDrag: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: prize.id,
+    disabled: !canDrag,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "relative",
+        isAwarded && "opacity-60",
+        isNextToDraw && "border-2 border-blue-500 shadow-md",
+        isDragging && "shadow-lg ring-2 ring-primary opacity-90"
+      )}
+      data-testid={isNextToDraw ? "next-to-draw-prize" : undefined}
+    >
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {canDrag && (
+              <button
+                type="button"
+                className={cn(
+                  "cursor-grab active:cursor-grabbing touch-none p-1 -ml-1 rounded hover:bg-muted",
+                  isLoading && "cursor-not-allowed opacity-50"
+                )}
+                aria-label={`Drag to reorder ${prize.name}`}
+                data-testid={`drag-handle-${prize.id}`}
+                {...attributes}
+                {...listeners}
+              >
+                <GripVertical className="h-5 w-5 text-muted-foreground" />
+              </button>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-muted-foreground font-mono">
+                  #{index + 1}
+                </span>
+                <CardTitle className="text-lg truncate">{prize.name}</CardTitle>
+                <PrizeStatusBadge prize={prize} />
+              </div>
+              {prize.description && (
+                <CardDescription className="mt-1 line-clamp-2">
+                  {prize.description}
+                </CardDescription>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => onEdit(prize)}
+              disabled={isLoading || !!prize.awarded_to}
+              aria-label={`Edit ${prize.name}`}
+              title={
+                prize.awarded_to
+                  ? "Cannot edit awarded prize"
+                  : `Edit ${prize.name}`
+              }
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => onDelete(prize)}
+              disabled={isLoading || !!prize.awarded_to}
+              aria-label={`Delete ${prize.name}`}
+              title={
+                prize.awarded_to
+                  ? "Cannot delete awarded prize"
+                  : `Delete ${prize.name}`
+              }
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      {prize.awarded_to && (
+        <CardContent className="pt-0">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Trophy className="h-4 w-4 text-green-600" aria-hidden="true" />
+            <span>
+              Awarded to{" "}
+              <span className="font-medium" data-testid="winner-name">
+                {prize.winner_name || "Unknown"}
+              </span>
+            </span>
+            {prize.awarded_at && (
+              <span className="text-xs" data-testid="award-timestamp">
+                on{" "}
+                {new Date(prize.awarded_at).toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            )}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * Displays a list of prizes for a raffle with drag-and-drop reordering
  * Shows prize name, description, award status, and action buttons
  *
  * Visual states:
- * - Awarded prizes: reduced opacity (grayed out)
+ * - Awarded prizes: reduced opacity (grayed out), cannot be dragged
  * - Next prize to draw: highlighted with blue border (when highlightNextToDraw=true)
  * - Winner name displayed for awarded prizes
+ * - Drag handle shown for non-awarded prizes
  */
 export function PrizeList({
   prizes,
   onEdit,
   onDelete,
-  onMoveUp,
-  onMoveDown,
+  onReorder,
   isLoading = false,
   highlightNextToDraw = false,
 }: PrizeListProps) {
-  // Find the index of the first non-awarded prize (next to be drawn)
   const nextToDrawIndex = prizes.findIndex((p) => !p.awarded_to);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const prizeIds = useMemo(() => prizes.map((p) => p.id), [prizes]);
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = prizes.findIndex((p) => p.id === active.id);
+      const newIndex = prizes.findIndex((p) => p.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(prizes, oldIndex, newIndex);
+        onReorder?.(newOrder);
+      }
+    }
+  }
 
   if (prizes.length === 0) {
     return (
@@ -71,136 +258,35 @@ export function PrizeList({
   }
 
   return (
-    <div className="space-y-4">
-      {prizes.map((prize, index) => {
-        const isAwarded = !!prize.awarded_to;
-        const isNextToDraw = highlightNextToDraw && index === nextToDrawIndex;
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext items={prizeIds} strategy={verticalListSortingStrategy}>
+        <div className="space-y-4" data-testid="prize-list">
+          {prizes.map((prize, index) => {
+            const isAwarded = !!prize.awarded_to;
+            const isNextToDraw = highlightNextToDraw && index === nextToDrawIndex;
+            const canDrag = !isAwarded && !isLoading && !!onReorder;
 
-        return (
-        <Card
-          key={prize.id}
-          className={cn(
-            // Awarded prizes: reduced opacity (grayed out)
-            isAwarded && "opacity-60",
-            // Next prize to draw: highlighted border
-            isNextToDraw && "border-2 border-blue-500 shadow-md"
-          )}
-          data-testid={isNextToDraw ? "next-to-draw-prize" : undefined}
-        >
-          <CardHeader className="pb-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-muted-foreground font-mono">
-                    #{index + 1}
-                  </span>
-                  <CardTitle className="text-lg truncate">{prize.name}</CardTitle>
-                  <PrizeStatusBadge prize={prize} />
-                </div>
-                {prize.description && (
-                  <CardDescription className="mt-1 line-clamp-2">
-                    {prize.description}
-                  </CardDescription>
-                )}
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {onMoveUp && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onMoveUp(prize)}
-                    disabled={isLoading || index === 0 || !!prize.awarded_to}
-                    aria-label={`Move ${prize.name} up`}
-                    title={
-                      prize.awarded_to
-                        ? "Cannot move awarded prize"
-                        : index === 0
-                          ? "Already first"
-                          : `Move ${prize.name} up`
-                    }
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </Button>
-                )}
-                {onMoveDown && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onMoveDown(prize)}
-                    disabled={isLoading || index === prizes.length - 1 || !!prize.awarded_to}
-                    aria-label={`Move ${prize.name} down`}
-                    title={
-                      prize.awarded_to
-                        ? "Cannot move awarded prize"
-                        : index === prizes.length - 1
-                          ? "Already last"
-                          : `Move ${prize.name} down`
-                    }
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => onEdit(prize)}
-                  disabled={isLoading || !!prize.awarded_to}
-                  aria-label={`Edit ${prize.name}`}
-                  title={
-                    prize.awarded_to
-                      ? "Cannot edit awarded prize"
-                      : `Edit ${prize.name}`
-                  }
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => onDelete(prize)}
-                  disabled={isLoading || !!prize.awarded_to}
-                  aria-label={`Delete ${prize.name}`}
-                  title={
-                    prize.awarded_to
-                      ? "Cannot delete awarded prize"
-                      : `Delete ${prize.name}`
-                  }
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          {prize.awarded_to && (
-            <CardContent className="pt-0">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Trophy className="h-4 w-4 text-green-600" aria-hidden="true" />
-                <span>
-                  Awarded to{" "}
-                  <span className="font-medium" data-testid="winner-name">
-                    {prize.winner_name || "Unknown"}
-                  </span>
-                </span>
-                {prize.awarded_at && (
-                  <span className="text-xs" data-testid="award-timestamp">
-                    on{" "}
-                    {new Date(prize.awarded_at).toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                )}
-              </div>
-            </CardContent>
-          )}
-        </Card>
-        );
-      })}
-    </div>
+            return (
+              <SortablePrizeCard
+                key={prize.id}
+                prize={prize}
+                index={index}
+                isAwarded={isAwarded}
+                isNextToDraw={isNextToDraw}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                isLoading={isLoading}
+                canDrag={canDrag}
+              />
+            );
+          })}
+        </div>
+      </SortableContext>
+    </DndContext>
   );
 }
 
