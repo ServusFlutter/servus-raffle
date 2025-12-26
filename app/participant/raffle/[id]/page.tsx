@@ -117,6 +117,7 @@ export default async function ParticipantRafflePage({
       showJoinedToast={joined}
       prizes={prizesResult.data || []}
       participants={wheelParticipants}
+      currentUserId={user.id}
     />
   );
 }

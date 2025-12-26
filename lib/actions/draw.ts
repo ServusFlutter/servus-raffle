@@ -513,12 +513,14 @@ export async function drawWinner(
       return { data: null, error: "Failed to award prize" };
     }
 
-    // 13. Broadcast WINNER_REVEALED event
+    // 13. Broadcast WINNER_REVEALED event (Story 6.5: includes ticketsAtWin and prizeName)
     const winnerRevealResult = await broadcastWinnerRevealed(
       raffleId,
       prizeId,
       selectedWinner.userId,
-      selectedWinner.name
+      selectedWinner.name,
+      selectedWinner.tickets,
+      prize.name
     );
     if (!winnerRevealResult.success) {
       console.warn("Failed to broadcast WINNER_REVEALED:", winnerRevealResult.error);

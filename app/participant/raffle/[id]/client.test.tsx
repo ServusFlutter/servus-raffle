@@ -53,6 +53,7 @@ describe("ParticipantRaffleClient", () => {
     perRaffleTicketCount: 1,
     joinedAt: "2025-12-25T10:00:00Z",
     prizes: [], // Story 5-3: Default to empty prizes array
+    currentUserId: "test-user-456", // Story 6.5: Current user for winner detection
   };
 
   beforeEach(() => {

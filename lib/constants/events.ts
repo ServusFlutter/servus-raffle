@@ -59,12 +59,18 @@ export type WheelSeedPayload = {
 
 /**
  * Payload for WINNER_REVEALED event
+ *
+ * Story 6.5: Added ticketsAtWin and prizeName for celebration display
  */
 export type WinnerRevealedPayload = {
   raffleId: string;
   prizeId: string;
   winnerId: string;
   winnerName: string;
+  /** Number of tickets the winner had at time of win (Story 6.5) */
+  ticketsAtWin: number;
+  /** Name of the prize awarded (Story 6.5) */
+  prizeName: string;
 };
 
 /**

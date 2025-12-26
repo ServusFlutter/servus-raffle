@@ -6,6 +6,7 @@ import Link from "next/link";
 import { X, Users, Ticket, Trophy, Gift, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBroadcastChannel } from "@/lib/supabase/useBroadcastChannel";
+import { WinnerCelebration, SUSPENSE_PAUSE_MS } from "@/components/raffle/winnerCelebration";
 import { subscribeToParticipantChanges } from "@/lib/supabase/realtime";
 import type { PrizeWithWinner } from "@/lib/actions/prizes";
 import type {
@@ -65,23 +66,22 @@ export function LiveDrawClient({
   const [liveTotalTickets, setLiveTotalTickets] = useState(initialTotalTickets);
 
   // State for draw events (Story 6.2)
-  // TODO(Story 6.3): Use drawInProgress to toggle draw button state
-  // TODO(Story 6.4): Use currentDrawPrize and wheelSeed for wheel animation
-  // TODO(Story 6.5): Use revealedWinner for winner celebration display
-  // These states are intentionally set but not yet rendered - they will be used in upcoming stories
+  // Story 6.5: Updated to use celebration display
   const [drawInProgress, setDrawInProgress] = useState(false);
   const [currentDrawPrize, setCurrentDrawPrize] = useState<string | null>(null);
   const [wheelSeed, setWheelSeed] = useState<number | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
   const [revealedWinner, setRevealedWinner] = useState<{
     winnerId: string;
     winnerName: string;
+    ticketsAtWin: number;
+    prizeName: string;
   } | null>(null);
 
-  // Suppress unused variable warnings - these are intentional placeholders for Story 6.3/6.4/6.5
+  // Suppress unused variable warnings - these are intentional placeholders for Story 6.3/6.4
   void drawInProgress;
   void currentDrawPrize;
   void wheelSeed;
-  void revealedWinner;
 
   // Broadcast event handlers (Story 6.2)
   const handleDrawStart = useCallback(
@@ -106,15 +106,20 @@ export function LiveDrawClient({
   const handleWinnerRevealed = useCallback(
     (event: BroadcastEvent<WinnerRevealedPayload>) => {
       console.log("[LiveDraw] Winner revealed:", event.payload.winnerName);
+      // Story 6.5: Store complete winner data and trigger celebration
       setRevealedWinner({
         winnerId: event.payload.winnerId,
         winnerName: event.payload.winnerName,
+        ticketsAtWin: event.payload.ticketsAtWin,
+        prizeName: event.payload.prizeName,
       });
       setDrawInProgress(false);
-      // Refresh to get updated prize data
-      router.refresh();
+      // Story 6.5: Show celebration after suspense pause
+      setTimeout(() => {
+        setShowCelebration(true);
+      }, SUSPENSE_PAUSE_MS);
     },
-    [router]
+    []
   );
 
   const handleRaffleEnded = useCallback(
@@ -124,6 +129,7 @@ export function LiveDrawClient({
       setCurrentDrawPrize(null);
       setWheelSeed(null);
       setRevealedWinner(null);
+      setShowCelebration(false);
       // Refresh to get final raffle state
       router.refresh();
     },
@@ -133,6 +139,15 @@ export function LiveDrawClient({
   const handleReconnect = useCallback(() => {
     console.log("[LiveDraw] Reconnecting - fetching current state");
     // On reconnect, refresh to get current state (Story 6.2 AC #5)
+    router.refresh();
+  }, [router]);
+
+  // Handler for celebration completion (Story 6.5)
+  const handleCelebrationComplete = useCallback(() => {
+    console.log("[LiveDraw] Celebration complete");
+    setShowCelebration(false);
+    setRevealedWinner(null);
+    // Refresh to get updated prize data
     router.refresh();
   }, [router]);
 
@@ -390,6 +405,22 @@ export function LiveDrawClient({
             ))}
           </div>
         </div>
+      )}
+
+      {/* WinnerCelebration - Full-screen winner celebration overlay (Story 6.5) */}
+      {/* Projection mode: currentUserId is empty since this is an admin display, not a participant view */}
+      {/* This ensures the celebration always shows the winner announcement (not "you won" personalization) */}
+      {revealedWinner && (
+        <WinnerCelebration
+          winnerId={revealedWinner.winnerId}
+          winnerName={revealedWinner.winnerName}
+          ticketsAtWin={revealedWinner.ticketsAtWin}
+          prizeName={revealedWinner.prizeName}
+          showCelebration={showCelebration}
+          currentUserId=""
+          isProjectionMode={true}
+          onCelebrationComplete={handleCelebrationComplete}
+        />
       )}
     </div>
   );

@@ -171,29 +171,37 @@ export async function broadcastWheelSeed(
  * Call this after the wheel animation duration to reveal the winner
  * to all participants simultaneously.
  *
+ * Story 6.5: Added ticketsAtWin and prizeName for celebration display
+ *
  * @param raffleId - UUID of the raffle
  * @param prizeId - UUID of the prize that was awarded
  * @param winnerId - UUID of the winning user
  * @param winnerName - Display name of the winner
+ * @param ticketsAtWin - Number of tickets the winner had at time of win
+ * @param prizeName - Name of the prize being awarded
  * @returns Promise that resolves when the event is sent
  *
  * @example
  * ```typescript
  * // In drawWinner Server Action (after animation delay)
- * await broadcastWinnerRevealed(raffleId, prizeId, winner.id, winner.name);
+ * await broadcastWinnerRevealed(raffleId, prizeId, winner.id, winner.name, 8, "Grand Prize");
  * ```
  */
 export async function broadcastWinnerRevealed(
   raffleId: string,
   prizeId: string,
   winnerId: string,
-  winnerName: string
+  winnerName: string,
+  ticketsAtWin: number,
+  prizeName: string
 ): Promise<BroadcastResult> {
   const payload: WinnerRevealedPayload = {
     raffleId,
     prizeId,
     winnerId,
     winnerName,
+    ticketsAtWin,
+    prizeName,
   };
 
   return broadcastDrawEvent(raffleId, RAFFLE_EVENTS.WINNER_REVEALED, payload);

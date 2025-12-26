@@ -10,6 +10,7 @@ import { TicketCircle, getTicketMessage } from "@/components/raffle/ticketCircle
 import { StatusBar } from "@/components/raffle/statusBar";
 import { PrizeListParticipant } from "@/components/raffle/prizeListParticipant";
 import { RaffleWheel } from "@/components/raffle/raffleWheel";
+import { WinnerCelebration, SUSPENSE_PAUSE_MS } from "@/components/raffle/winnerCelebration";
 import {
   RaffleStatusIndicator,
   type RaffleStatus,
@@ -58,6 +59,8 @@ interface ParticipantRaffleClientProps {
   prizes: ParticipantPrize[];
   /** Participants for the wheel animation (Story 6.4) */
   participants?: WheelParticipant[];
+  /** Current user ID for winner detection (Story 6.5) */
+  currentUserId: string;
 }
 
 /**
@@ -76,6 +79,7 @@ export function ParticipantRaffleClient({
   showJoinedToast,
   prizes,
   participants = [],
+  currentUserId,
 }: ParticipantRaffleClientProps) {
   // Calculate if this is a multi-event user (accumulated tickets differ from per-raffle)
   const isMultiEventUser = ticketCount > perRaffleTicketCount;
@@ -87,18 +91,18 @@ export function ParticipantRaffleClient({
 
   // State for draw events (Story 6.2 AC #1, #2)
   // Story 6.4: Added wheel animation states
-  // TODO(Story 6.5): Use revealedWinner for winner celebration display
+  // Story 6.5: Added winner celebration states
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [currentDrawPrize, setCurrentDrawPrize] = useState<string | null>(null);
   const [wheelSeed, setWheelSeed] = useState<number | null>(null);
   const [isWheelSpinning, setIsWheelSpinning] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
   const [revealedWinner, setRevealedWinner] = useState<{
     winnerId: string;
     winnerName: string;
+    ticketsAtWin: number;
+    prizeName: string;
   } | null>(null);
-
-  // Suppress unused variable warnings - these are intentional placeholders for Story 6.5
-  void currentDrawPrize;
-  void revealedWinner;
 
   // Broadcast event handlers (Story 6.2)
   // Story 6.4: Updated to control wheel animation
@@ -124,27 +128,32 @@ export function ParticipantRaffleClient({
     []
   );
 
-  // Handler for wheel spin completion (Story 6.4)
+  // Handler for wheel spin completion (Story 6.4, 6.5)
+  // After wheel animation completes, wait for the 500ms suspense pause then show celebration
   const handleWheelSpinComplete = useCallback(() => {
     console.log("[Participant] Wheel spin animation complete");
-    // Keep wheel visible briefly after spin completes
-    // The winner reveal will trigger hiding the wheel
+    // Story 6.5: Hide wheel and show celebration after suspense pause
+    setTimeout(() => {
+      setIsWheelSpinning(false);
+      setWheelSeed(null);
+      setShowCelebration(true);
+    }, SUSPENSE_PAUSE_MS);
   }, []);
 
   const handleWinnerRevealed = useCallback(
     (event: BroadcastEvent<WinnerRevealedPayload>) => {
       console.log("[Participant] Winner revealed:", event.payload.winnerName);
+      // Story 6.5: Store complete winner data for celebration display
       setRevealedWinner({
         winnerId: event.payload.winnerId,
         winnerName: event.payload.winnerName,
+        ticketsAtWin: event.payload.ticketsAtWin,
+        prizeName: event.payload.prizeName,
       });
-      // Hide the wheel when winner is revealed (Story 6.4)
-      setIsWheelSpinning(false);
-      setWheelSeed(null);
-      // Refresh to get updated prize data
-      router.refresh();
+      // Note: Wheel hiding and celebration showing is now handled by handleWheelSpinComplete
+      // after the wheel animation completes
     },
-    [router]
+    []
   );
 
   const handleRaffleEnded = useCallback(
@@ -153,6 +162,7 @@ export function ParticipantRaffleClient({
       setCurrentDrawPrize(null);
       setWheelSeed(null);
       setRevealedWinner(null);
+      setShowCelebration(false);
       // Refresh to get final raffle state
       router.refresh();
     },
@@ -162,6 +172,15 @@ export function ParticipantRaffleClient({
   const handleReconnect = useCallback(() => {
     console.log("[Participant] Reconnecting - fetching current state");
     // On reconnect, refresh to get current state (Story 6.2 AC #5)
+    router.refresh();
+  }, [router]);
+
+  // Handler for celebration completion (Story 6.5)
+  const handleCelebrationComplete = useCallback(() => {
+    console.log("[Participant] Celebration complete");
+    setShowCelebration(false);
+    setRevealedWinner(null);
+    // Refresh to get updated prize data
     router.refresh();
   }, [router]);
 
@@ -314,6 +333,20 @@ export function ParticipantRaffleClient({
           seed={wheelSeed}
           isSpinning={isWheelSpinning}
           onSpinComplete={handleWheelSpinComplete}
+        />
+      )}
+
+      {/* WinnerCelebration - Full-screen winner celebration overlay (Story 6.5) */}
+      {revealedWinner && (
+        <WinnerCelebration
+          winnerId={revealedWinner.winnerId}
+          winnerName={revealedWinner.winnerName}
+          ticketsAtWin={revealedWinner.ticketsAtWin}
+          prizeName={revealedWinner.prizeName}
+          showCelebration={showCelebration}
+          currentUserId={currentUserId}
+          currentUserTicketCount={ticketCount}
+          onCelebrationComplete={handleCelebrationComplete}
         />
       )}
     </div>
