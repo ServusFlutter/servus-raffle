@@ -72,10 +72,10 @@ development_status:
   epic-4-retrospective: done
 
   # Epic 5: Admin Dashboard & Participant Visibility
-  epic-5: in-progress
+  epic-5: done
   5-1-participant-list-and-statistics-dashboard: done
   5-2-raffle-history-view: done
-  5-3-participant-prize-and-status-view: ready-for-dev
+  5-3-participant-prize-and-status-view: done
   epic-5-retrospective: optional
 
   # Epic 6: Live Draw Experience

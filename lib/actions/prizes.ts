@@ -7,6 +7,7 @@ import {
   CreatePrizeSchema,
   UpdatePrizeSchema,
   type Prize,
+  type ParticipantPrize,
 } from "@/lib/schemas/prize";
 
 /**
@@ -878,5 +879,90 @@ export async function getPrizeCount(
   } catch (e) {
     console.error("Unexpected error counting prizes:", e);
     return { data: null, error: "Failed to count prizes" };
+  }
+}
+
+/**
+ * Get prizes for a raffle from participant perspective.
+ * Returns limited info - no winner details, just award status.
+ *
+ * NOTE: This does NOT require admin status - participants can call this
+ * for raffles they have joined.
+ *
+ * Used for Story 5-3: Participant Prize & Status View (FR33, FR34).
+ *
+ * @param raffleId - UUID of the raffle
+ * @returns ActionResult with array of ParticipantPrize (limited info)
+ *
+ * @example
+ * ```typescript
+ * const result = await getPrizesForParticipant("123e4567-...")
+ * if (result.data) {
+ *   // Each prize has limited info:
+ *   // - id, name, description, sort_order
+ *   // - is_awarded (boolean, NOT the winner ID)
+ *   result.data.forEach(prize => {
+ *     console.log(`${prize.name}: ${prize.is_awarded ? "Awarded" : "Available"}`)
+ *   })
+ * }
+ * ```
+ */
+export async function getPrizesForParticipant(
+  raffleId: string
+): Promise<ActionResult<ParticipantPrize[]>> {
+  try {
+    // 1. Validate UUID format
+    if (!UUID_REGEX.test(raffleId)) {
+      return { data: null, error: "Invalid raffle ID" };
+    }
+
+    // 2. Get authenticated user (NOT admin check - participants can call this)
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: "Authentication required" };
+    }
+
+    // 3. Verify user is a participant in this raffle
+    const { data: participation, error: partError } = await supabase
+      .from("participants")
+      .select("id")
+      .eq("raffle_id", raffleId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (partError || !participation) {
+      return { data: null, error: "Not a participant in this raffle" };
+    }
+
+    // 4. Fetch prizes with limited info (RLS will enforce access)
+    const { data: prizes, error } = await supabase
+      .from("prizes")
+      .select("id, name, description, sort_order, awarded_to")
+      .eq("raffle_id", raffleId)
+      .order("sort_order", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching prizes:", error);
+      return { data: null, error: "Failed to fetch prizes" };
+    }
+
+    // 5. Transform to ParticipantPrize (hide winner details)
+    const participantPrizes: ParticipantPrize[] = (prizes || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      sort_order: p.sort_order,
+      is_awarded: p.awarded_to !== null, // Boolean only
+    }));
+
+    return { data: participantPrizes, error: null };
+  } catch (e) {
+    console.error("Unexpected error:", e);
+    return { data: null, error: "Failed to fetch prizes" };
   }
 }

@@ -5,10 +5,12 @@ import { toast } from "sonner";
 // Mock next/navigation
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockRefresh = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
     replace: mockReplace,
+    refresh: mockRefresh,
   }),
 }));
 
@@ -21,6 +23,16 @@ jest.mock("sonner", () => ({
   },
 }));
 
+// Mock realtime subscriptions (Story 5-3)
+jest.mock("@/lib/supabase/realtime", () => ({
+  subscribeToRaffleStatusChanges: jest.fn(() => ({
+    unsubscribe: jest.fn(),
+  })),
+  subscribeToPrizeChanges: jest.fn(() => ({
+    unsubscribe: jest.fn(),
+  })),
+}));
+
 const mockToast = toast as jest.Mocked<typeof toast>;
 
 describe("ParticipantRaffleClient", () => {
@@ -31,6 +43,7 @@ describe("ParticipantRaffleClient", () => {
     ticketCount: 3,
     perRaffleTicketCount: 1,
     joinedAt: "2025-12-25T10:00:00Z",
+    prizes: [], // Story 5-3: Default to empty prizes array
   };
 
   beforeEach(() => {
@@ -270,7 +283,10 @@ describe("ParticipantRaffleClient", () => {
     it("shows pulsing green dot in StatusBar", () => {
       render(<ParticipantRaffleClient {...defaultProps} raffleStatus="active" />);
 
-      const dot = screen.getByTestId("status-dot");
+      // Get the status dot within the StatusBar specifically (not the RaffleStatusIndicator)
+      const statusBar = screen.getByTestId("status-bar");
+      const dot = statusBar.querySelector('[data-testid="status-dot"]');
+      expect(dot).toBeInTheDocument();
       expect(dot).toHaveClass("bg-green-500");
       expect(dot).toHaveClass("animate-pulse");
     });

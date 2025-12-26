@@ -4,17 +4,29 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { TicketCircle, getTicketMessage } from "@/components/raffle/ticketCircle";
 import { StatusBar } from "@/components/raffle/statusBar";
-
-// Valid raffle statuses that the client can display
-type RaffleStatus = "active" | "drawing" | "completed";
+import { PrizeListParticipant } from "@/components/raffle/prizeListParticipant";
+import {
+  RaffleStatusIndicator,
+  type RaffleStatus,
+} from "@/components/raffle/raffleStatusIndicator";
+import {
+  subscribeToRaffleStatusChanges,
+  subscribeToPrizeChanges,
+} from "@/lib/supabase/realtime";
+import type { ParticipantPrize } from "@/lib/schemas/prize";
 
 // Type guard to validate raffle status
 function isValidRaffleStatus(status: string): status is RaffleStatus {
-  return status === "active" || status === "drawing" || status === "completed";
+  return (
+    status === "active" ||
+    status === "drawing" ||
+    status === "completed" ||
+    status === "draft"
+  );
 }
 
 interface ParticipantRaffleClientProps {
@@ -25,6 +37,8 @@ interface ParticipantRaffleClientProps {
   perRaffleTicketCount: number;
   joinedAt: string;
   showJoinedToast?: string;
+  /** Prizes for participant view (Story 5-3) */
+  prizes: ParticipantPrize[];
 }
 
 /**
@@ -39,6 +53,7 @@ export function ParticipantRaffleClient({
   perRaffleTicketCount,
   joinedAt,
   showJoinedToast,
+  prizes,
 }: ParticipantRaffleClientProps) {
   // Calculate if this is a multi-event user (accumulated tickets differ from per-raffle)
   const isMultiEventUser = ticketCount > perRaffleTicketCount;
@@ -70,6 +85,29 @@ export function ParticipantRaffleClient({
       router.replace(`/participant/raffle/${raffleId}`, { scroll: false });
     }
   }, [showJoinedToast, raffleId, router, ticketCount]);
+
+  // Real-time subscriptions for raffle status and prize changes (Story 5-3 AC #4)
+  useEffect(() => {
+    // Subscribe to raffle status changes
+    const statusChannel = subscribeToRaffleStatusChanges(raffleId, () => {
+      router.refresh(); // Re-fetch server data
+    });
+
+    // Subscribe to prize award changes
+    const prizeChannel = subscribeToPrizeChanges(raffleId, () => {
+      router.refresh(); // Re-fetch server data
+    });
+
+    return () => {
+      statusChannel.unsubscribe();
+      prizeChannel.unsubscribe();
+    };
+  }, [raffleId, router]);
+
+  // Validate and get raffle status for components
+  const validatedStatus: RaffleStatus = isValidRaffleStatus(raffleStatus)
+    ? raffleStatus
+    : "draft";
 
   const getStatusBadge = () => {
     switch (raffleStatus) {
@@ -126,26 +164,12 @@ export function ParticipantRaffleClient({
             )}
           </div>
 
-          {/* Status */}
-          {raffleStatus === "active" && (
-            <div className="flex items-center justify-center gap-2 text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>Waiting for draw...</span>
-            </div>
-          )}
+          {/* Raffle Status Indicator (Story 5-3 AC #3, #6) */}
+          <RaffleStatusIndicator status={validatedStatus} />
 
-          {raffleStatus === "drawing" && (
-            <div className="flex items-center justify-center gap-2 text-primary">
-              <Clock className="h-4 w-4 animate-pulse" />
-              <span className="font-medium">Draw in progress!</span>
-            </div>
-          )}
-
-          {raffleStatus === "completed" && (
-            <div className="flex items-center justify-center gap-2 text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4" />
-              <span>Raffle has ended</span>
-            </div>
+          {/* Prize List (Story 5-3 AC #1, #2, #5) */}
+          {prizes.length > 0 && (
+            <PrizeListParticipant prizes={prizes} className="mt-4" />
           )}
 
           {/* Join Date */}
@@ -163,8 +187,8 @@ export function ParticipantRaffleClient({
       </Card>
 
       {/* StatusBar - fixed at bottom, only visible for active raffles (AC #2, #3) */}
-      {isValidRaffleStatus(raffleStatus) && (
-        <StatusBar status={raffleStatus} />
+      {validatedStatus !== "draft" && (
+        <StatusBar status={validatedStatus} />
       )}
     </div>
   );

@@ -11,6 +11,7 @@ import {
   reorderPrizes,
   movePrizeUp,
   movePrizeDown,
+  getPrizesForParticipant,
 } from "./prizes";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
@@ -1155,6 +1156,245 @@ describe("Prize Server Actions", () => {
           data: null,
           error: "Cannot swap with awarded prize",
         });
+      });
+    });
+  });
+
+  describe("getPrizesForParticipant", () => {
+    const mockPrizesData = [
+      {
+        id: "prize-1",
+        name: "First Prize",
+        description: "A great prize",
+        sort_order: 0,
+        awarded_to: null,
+      },
+      {
+        id: "prize-2",
+        name: "Second Prize",
+        description: null,
+        sort_order: 1,
+        awarded_to: "winner-user-id",
+      },
+    ];
+
+    describe("authentication", () => {
+      it("returns error when user is not authenticated", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: null },
+          error: null,
+        });
+
+        const result = await getPrizesForParticipant(mockRaffleId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Authentication required",
+        });
+      });
+
+      it("returns error when auth fails", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: null },
+          error: { message: "Auth error" },
+        });
+
+        const result = await getPrizesForParticipant(mockRaffleId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Authentication required",
+        });
+      });
+    });
+
+    describe("validation", () => {
+      it("returns error for invalid raffle UUID", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "user-1", email: "user@test.com" } },
+          error: null,
+        });
+
+        const result = await getPrizesForParticipant("invalid-uuid");
+
+        expect(result).toEqual({
+          data: null,
+          error: "Invalid raffle ID",
+        });
+      });
+    });
+
+    describe("participation check", () => {
+      it("returns error when user is not a participant", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "user-1", email: "user@test.com" } },
+          error: null,
+        });
+        mockSupabase.single.mockResolvedValue({
+          data: null,
+          error: { code: "PGRST116", message: "Not found" },
+        });
+
+        const result = await getPrizesForParticipant(mockRaffleId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Not a participant in this raffle",
+        });
+      });
+    });
+
+    describe("successful fetch", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "user-1", email: "user@test.com" } },
+          error: null,
+        });
+      });
+
+      it("returns prizes with limited info (no winner details)", async () => {
+        // First call: check participation
+        mockSupabase.single.mockResolvedValueOnce({
+          data: { id: "participation-1" },
+          error: null,
+        });
+        // Second call: fetch prizes
+        mockSupabase.order.mockResolvedValueOnce({
+          data: mockPrizesData,
+          error: null,
+        });
+
+        const result = await getPrizesForParticipant(mockRaffleId);
+
+        expect(result.error).toBeNull();
+        expect(result.data).toHaveLength(2);
+        // Verify is_awarded is boolean, not the actual winner ID
+        expect(result.data![0].is_awarded).toBe(false);
+        expect(result.data![1].is_awarded).toBe(true);
+        // Verify winner ID is NOT exposed
+        expect(result.data![0]).not.toHaveProperty("awarded_to");
+        expect(result.data![1]).not.toHaveProperty("awarded_to");
+      });
+
+      it("returns prizes sorted by sort_order ascending", async () => {
+        mockSupabase.single.mockResolvedValueOnce({
+          data: { id: "participation-1" },
+          error: null,
+        });
+        mockSupabase.order.mockResolvedValueOnce({
+          data: mockPrizesData,
+          error: null,
+        });
+
+        await getPrizesForParticipant(mockRaffleId);
+
+        expect(mockSupabase.order).toHaveBeenCalledWith("sort_order", {
+          ascending: true,
+        });
+      });
+
+      it("returns empty array when no prizes exist", async () => {
+        mockSupabase.single.mockResolvedValueOnce({
+          data: { id: "participation-1" },
+          error: null,
+        });
+        mockSupabase.order.mockResolvedValueOnce({
+          data: [],
+          error: null,
+        });
+
+        const result = await getPrizesForParticipant(mockRaffleId);
+
+        expect(result).toEqual({ data: [], error: null });
+      });
+
+      it("includes name and description in response", async () => {
+        mockSupabase.single.mockResolvedValueOnce({
+          data: { id: "participation-1" },
+          error: null,
+        });
+        mockSupabase.order.mockResolvedValueOnce({
+          data: mockPrizesData,
+          error: null,
+        });
+
+        const result = await getPrizesForParticipant(mockRaffleId);
+
+        expect(result.data![0]).toEqual({
+          id: "prize-1",
+          name: "First Prize",
+          description: "A great prize",
+          sort_order: 0,
+          is_awarded: false,
+        });
+      });
+
+      it("handles null descriptions", async () => {
+        mockSupabase.single.mockResolvedValueOnce({
+          data: { id: "participation-1" },
+          error: null,
+        });
+        mockSupabase.order.mockResolvedValueOnce({
+          data: mockPrizesData,
+          error: null,
+        });
+
+        const result = await getPrizesForParticipant(mockRaffleId);
+
+        expect(result.data![1].description).toBeNull();
+      });
+    });
+
+    describe("database error", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "user-1", email: "user@test.com" } },
+          error: null,
+        });
+      });
+
+      it("returns error when prize fetch fails", async () => {
+        mockSupabase.single.mockResolvedValueOnce({
+          data: { id: "participation-1" },
+          error: null,
+        });
+        mockSupabase.order.mockResolvedValueOnce({
+          data: null,
+          error: { message: "Database error" },
+        });
+
+        const result = await getPrizesForParticipant(mockRaffleId);
+
+        expect(result).toEqual({
+          data: null,
+          error: "Failed to fetch prizes",
+        });
+      });
+    });
+
+    describe("does not require admin", () => {
+      it("works for non-admin users who are participants", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: "user-1", email: "regular-user@test.com" } },
+          error: null,
+        });
+        (isAdmin as jest.Mock).mockReturnValue(false);
+
+        mockSupabase.single.mockResolvedValueOnce({
+          data: { id: "participation-1" },
+          error: null,
+        });
+        mockSupabase.order.mockResolvedValueOnce({
+          data: mockPrizesData,
+          error: null,
+        });
+
+        const result = await getPrizesForParticipant(mockRaffleId);
+
+        expect(result.error).toBeNull();
+        expect(result.data).toHaveLength(2);
+        // Does not check admin status
+        expect(isAdmin).not.toHaveBeenCalled();
       });
     });
   });

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { ParticipantRaffleClient } from "./client";
 import { getAccumulatedTickets } from "@/lib/actions/tickets";
+import { getPrizesForParticipant } from "@/lib/actions/prizes";
 
 interface ParticipantRafflePageProps {
   params: Promise<{ id: string }>;
@@ -78,6 +79,9 @@ export default async function ParticipantRafflePage({
   const accumulatedResult = await getAccumulatedTickets();
   const accumulatedTickets = accumulatedResult.data ?? participation.ticket_count;
 
+  // Fetch prizes for participant view (Story 5-3)
+  const prizesResult = await getPrizesForParticipant(id);
+
   return (
     <ParticipantRaffleClient
       raffleId={id}
@@ -87,6 +91,7 @@ export default async function ParticipantRafflePage({
       perRaffleTicketCount={participation.ticket_count}
       joinedAt={participation.joined_at}
       showJoinedToast={joined}
+      prizes={prizesResult.data || []}
     />
   );
 }

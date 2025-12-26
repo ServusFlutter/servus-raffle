@@ -223,3 +223,65 @@ export function subscribeToParticipantChanges(
 export async function unsubscribe(channel: RealtimeChannel): Promise<void> {
   await channel.unsubscribe();
 }
+
+/**
+ * Payload type for raffle change events
+ */
+export type RaffleChangePayload = RealtimePostgresChangesPayload<{
+  [key: string]: unknown;
+}>;
+
+/**
+ * Callback type for raffle status update events
+ */
+export type RaffleStatusUpdateCallback = (payload: RaffleChangePayload) => void;
+
+/**
+ * Subscribe to raffle status changes.
+ *
+ * This creates a Postgres Changes subscription that will receive
+ * real-time updates when the raffle status changes (e.g., active -> drawing -> completed).
+ *
+ * Used for Story 5-3: Participant Prize & Status View (FR34).
+ *
+ * @example
+ * ```typescript
+ * // In a React component
+ * useEffect(() => {
+ *   const channel = subscribeToRaffleStatusChanges(raffleId, (payload) => {
+ *     if (payload.eventType === 'UPDATE') {
+ *       // Raffle status changed
+ *       router.refresh();
+ *     }
+ *   });
+ *
+ *   return () => {
+ *     channel.unsubscribe();
+ *   };
+ * }, [raffleId]);
+ * ```
+ *
+ * @param raffleId - UUID of the raffle to monitor
+ * @param onStatusChange - Callback invoked when raffle status changes
+ * @returns RealtimeChannel that can be used to unsubscribe
+ */
+export function subscribeToRaffleStatusChanges(
+  raffleId: string,
+  onStatusChange: RaffleStatusUpdateCallback
+): RealtimeChannel {
+  const supabase = createClient();
+
+  return supabase
+    .channel(`raffle-status:${raffleId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "raffles",
+        filter: `id=eq.${raffleId}`,
+      },
+      onStatusChange
+    )
+    .subscribe();
+}

@@ -78,3 +78,24 @@ export type UpdatePrizeInput = z.infer<typeof UpdatePrizeSchema>;
  * Type for a full prize object
  */
 export type Prize = z.infer<typeof PrizeSchema>;
+
+/**
+ * Schema for participant-facing prize data (limited info for privacy)
+ *
+ * Used in Story 5-3: Participant Prize & Status View (FR33, FR34).
+ * Does NOT expose winner user_id or awarded_to details to participants.
+ * Only shows whether a prize has been awarded (boolean).
+ */
+export const ParticipantPrizeSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  sort_order: z.number().int(),
+  is_awarded: z.boolean(),
+});
+
+/**
+ * Type for participant-facing prize data
+ * Limited info - no winner details, just award status
+ */
+export type ParticipantPrize = z.infer<typeof ParticipantPrizeSchema>;
