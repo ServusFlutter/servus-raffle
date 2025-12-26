@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { TicketCircle, getTicketMessage } from "@/components/raffle/ticketCircle";
 import { StatusBar } from "@/components/raffle/statusBar";
 import { PrizeListParticipant } from "@/components/raffle/prizeListParticipant";
+import { RaffleWheel } from "@/components/raffle/raffleWheel";
 import {
   RaffleStatusIndicator,
   type RaffleStatus,
@@ -37,6 +38,14 @@ function isValidRaffleStatus(status: string): status is RaffleStatus {
   );
 }
 
+/**
+ * Participant entry for the wheel
+ */
+interface WheelParticipant {
+  id: string;
+  name: string;
+}
+
 interface ParticipantRaffleClientProps {
   raffleId: string;
   raffleName: string;
@@ -47,6 +56,8 @@ interface ParticipantRaffleClientProps {
   showJoinedToast?: string;
   /** Prizes for participant view (Story 5-3) */
   prizes: ParticipantPrize[];
+  /** Participants for the wheel animation (Story 6.4) */
+  participants?: WheelParticipant[];
 }
 
 /**
@@ -64,6 +75,7 @@ export function ParticipantRaffleClient({
   joinedAt,
   showJoinedToast,
   prizes,
+  participants = [],
 }: ParticipantRaffleClientProps) {
   // Calculate if this is a multi-event user (accumulated tickets differ from per-raffle)
   const isMultiEventUser = ticketCount > perRaffleTicketCount;
@@ -74,28 +86,30 @@ export function ParticipantRaffleClient({
     useState<string>("");
 
   // State for draw events (Story 6.2 AC #1, #2)
-  // TODO(Story 6.4): Use currentDrawPrize and wheelSeed for wheel animation
+  // Story 6.4: Added wheel animation states
   // TODO(Story 6.5): Use revealedWinner for winner celebration display
-  // These states are intentionally set but not yet rendered - they will be used in upcoming stories
   const [currentDrawPrize, setCurrentDrawPrize] = useState<string | null>(null);
   const [wheelSeed, setWheelSeed] = useState<number | null>(null);
+  const [isWheelSpinning, setIsWheelSpinning] = useState(false);
   const [revealedWinner, setRevealedWinner] = useState<{
     winnerId: string;
     winnerName: string;
   } | null>(null);
 
-  // Suppress unused variable warnings - these are intentional placeholders for Story 6.4/6.5
+  // Suppress unused variable warnings - these are intentional placeholders for Story 6.5
   void currentDrawPrize;
-  void wheelSeed;
   void revealedWinner;
 
   // Broadcast event handlers (Story 6.2)
+  // Story 6.4: Updated to control wheel animation
   const handleDrawStart = useCallback(
     (event: BroadcastEvent<DrawStartPayload>) => {
       console.log("[Participant] Draw started for prize:", event.payload.prizeName);
       setCurrentDrawPrize(event.payload.prizeName);
       setWheelSeed(null);
       setRevealedWinner(null);
+      // Show the wheel overlay immediately when draw starts
+      setIsWheelSpinning(true);
     },
     []
   );
@@ -104,9 +118,18 @@ export function ParticipantRaffleClient({
     (event: BroadcastEvent<WheelSeedPayload>) => {
       console.log("[Participant] Wheel seed received:", event.payload.seed);
       setWheelSeed(event.payload.seed);
+      // Ensure wheel is spinning when seed is received
+      setIsWheelSpinning(true);
     },
     []
   );
+
+  // Handler for wheel spin completion (Story 6.4)
+  const handleWheelSpinComplete = useCallback(() => {
+    console.log("[Participant] Wheel spin animation complete");
+    // Keep wheel visible briefly after spin completes
+    // The winner reveal will trigger hiding the wheel
+  }, []);
 
   const handleWinnerRevealed = useCallback(
     (event: BroadcastEvent<WinnerRevealedPayload>) => {
@@ -115,6 +138,9 @@ export function ParticipantRaffleClient({
         winnerId: event.payload.winnerId,
         winnerName: event.payload.winnerName,
       });
+      // Hide the wheel when winner is revealed (Story 6.4)
+      setIsWheelSpinning(false);
+      setWheelSeed(null);
       // Refresh to get updated prize data
       router.refresh();
     },
@@ -279,6 +305,16 @@ export function ParticipantRaffleClient({
       {/* StatusBar - fixed at bottom, only visible for active raffles (AC #2, #3) */}
       {validatedStatus !== "draft" && (
         <StatusBar status={validatedStatus} />
+      )}
+
+      {/* RaffleWheel - Full-screen wheel animation overlay (Story 6.4) */}
+      {participants.length > 0 && (
+        <RaffleWheel
+          participants={participants}
+          seed={wheelSeed}
+          isSpinning={isWheelSpinning}
+          onSpinComplete={handleWheelSpinComplete}
+        />
       )}
     </div>
   );

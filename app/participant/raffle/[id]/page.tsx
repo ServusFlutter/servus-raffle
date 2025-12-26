@@ -82,6 +82,30 @@ export default async function ParticipantRafflePage({
   // Fetch prizes for participant view (Story 5-3)
   const prizesResult = await getPrizesForParticipant(id);
 
+  // Fetch all participants for wheel animation (Story 6.4)
+  // Get participant names joined with users table
+  const { data: participantsData } = await supabase
+    .from("participants")
+    .select(`
+      id,
+      user_id,
+      users!inner (
+        name
+      )
+    `)
+    .eq("raffle_id", id);
+
+  // Transform participants for wheel display
+  // The users join returns an object with name property
+  const wheelParticipants = (participantsData || []).map((p) => {
+    // Supabase returns users as an object when using !inner join
+    const userData = p.users as unknown as { name: string } | null;
+    return {
+      id: p.user_id,
+      name: userData?.name || "Participant",
+    };
+  });
+
   return (
     <ParticipantRaffleClient
       raffleId={id}
@@ -92,6 +116,7 @@ export default async function ParticipantRafflePage({
       joinedAt={participation.joined_at}
       showJoinedToast={joined}
       prizes={prizesResult.data || []}
+      participants={wheelParticipants}
     />
   );
 }
