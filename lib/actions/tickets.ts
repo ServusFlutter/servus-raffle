@@ -1,14 +1,11 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   JoinRaffleSchema,
   type Participant,
 } from "@/lib/schemas/participant";
-import { revalidatePath } from "next/cache";
-
-// Re-export Participant type for consumers of this module
-export type { Participant };
 
 /**
  * ActionResult type for consistent Server Action responses
@@ -58,7 +55,10 @@ export async function joinRaffle(
       return { data: null, error: "Invalid raffle ID" };
     }
 
+    // Use regular client for auth (reads cookies)
     const supabase = await createClient();
+    // Use admin client for database operations (bypasses RLS)
+    const adminClient = createAdminClient();
 
     // Get current user
     const {
@@ -70,7 +70,7 @@ export async function joinRaffle(
     }
 
     // Check raffle exists and is active
-    const { data: raffle, error: raffleError } = await supabase
+    const { data: raffle, error: raffleError } = await adminClient
       .from("raffles")
       .select("id, status, qr_code_expires_at")
       .eq("id", raffleId)
@@ -85,7 +85,7 @@ export async function joinRaffle(
     }
 
     // Check for existing participation first
-    const { data: existingParticipant } = await supabase
+    const { data: existingParticipant } = await adminClient
       .from("participants")
       .select("*")
       .eq("raffle_id", raffleId)
@@ -94,7 +94,6 @@ export async function joinRaffle(
 
     if (existingParticipant) {
       // Already joined - return existing record (AC #4)
-      revalidatePath(`/participant/raffle/${raffleId}`);
       return {
         data: {
           participant: existingParticipant,
@@ -105,7 +104,7 @@ export async function joinRaffle(
     }
 
     // Insert new participant record
-    const { data: newParticipant, error: insertError } = await supabase
+    const { data: newParticipant, error: insertError } = await adminClient
       .from("participants")
       .insert({
         raffle_id: raffleId,
@@ -119,7 +118,7 @@ export async function joinRaffle(
       // Handle race condition - record was created between check and insert
       if (insertError.code === "23505") {
         // Unique constraint violation - fetch existing
-        const { data: existing } = await supabase
+        const { data: existing } = await adminClient
           .from("participants")
           .select("*")
           .eq("raffle_id", raffleId)
@@ -127,7 +126,6 @@ export async function joinRaffle(
           .single();
 
         if (existing) {
-          revalidatePath(`/participant/raffle/${raffleId}`);
           return {
             data: {
               participant: existing,
@@ -142,7 +140,6 @@ export async function joinRaffle(
       return { data: null, error: "Failed to join raffle" };
     }
 
-    revalidatePath(`/participant/raffle/${raffleId}`);
     return {
       data: {
         participant: newParticipant,
