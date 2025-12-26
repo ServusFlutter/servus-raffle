@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.meetup.com)",
+      "Skill(bmad:bmm:workflows:generate-project-context)",
+      "Bash(lsof:*)"
+    ]
+  }
+}
