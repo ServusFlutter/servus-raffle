@@ -275,7 +275,7 @@ describe("WinnerCelebration", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/Not this time - your 5 tickets carry forward!/i)
+          screen.getByText(/Not this time - your 5 tickets carry forward to the next raffle!/i)
         ).toBeInTheDocument();
       });
     });
@@ -357,6 +357,150 @@ describe("WinnerCelebration", () => {
         const winnerCard = screen.getByTestId("winner-card");
         // Check that projection mode class is applied
         expect(winnerCard).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Winner Post-Celebration Message (Story 6.6 AC #3)", () => {
+    it("shows congratulations message to winner after celebration", async () => {
+      render(
+        <WinnerCelebration
+          {...defaultWinnerData}
+          showCelebration={true}
+          currentUserId="user-123"
+        />
+      );
+
+      // Advance past suspense + celebration duration
+      act(() => {
+        jest.advanceTimersByTime(SUSPENSE_PAUSE_MS + 3000);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Congratulations!")).toBeInTheDocument();
+      });
+    });
+
+    it("shows prize name in winner message", async () => {
+      render(
+        <WinnerCelebration
+          {...defaultWinnerData}
+          showCelebration={true}
+          currentUserId="user-123"
+        />
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(SUSPENSE_PAUSE_MS + 3000);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/You won Grand Prize!/i)).toBeInTheDocument();
+      });
+    });
+
+    it("shows ticket reset message to winner", async () => {
+      render(
+        <WinnerCelebration
+          {...defaultWinnerData}
+          showCelebration={true}
+          currentUserId="user-123"
+        />
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(SUSPENSE_PAUSE_MS + 3000);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Your tickets have been reset to 0/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows 'See you at the next meetup' message", async () => {
+      render(
+        <WinnerCelebration
+          {...defaultWinnerData}
+          showCelebration={true}
+          currentUserId="user-123"
+        />
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(SUSPENSE_PAUSE_MS + 3000);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/See you at the next meetup!/i)
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Non-Winner Message (Story 6.6 AC #4)", () => {
+    it("shows non-winner message with correct ticket count", async () => {
+      render(
+        <WinnerCelebration
+          {...defaultWinnerData}
+          showCelebration={true}
+          currentUserId="other-user"
+          currentUserTicketCount={5}
+        />
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(SUSPENSE_PAUSE_MS + 3000);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Not this time - your 5 tickets carry forward to the next raffle!/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows singular 'ticket carries' for 1 ticket", async () => {
+      render(
+        <WinnerCelebration
+          {...defaultWinnerData}
+          showCelebration={true}
+          currentUserId="other-user"
+          currentUserTicketCount={1}
+        />
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(SUSPENSE_PAUSE_MS + 3000);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Not this time - your 1 ticket carries forward to the next raffle!/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows congratulations to winner name in non-winner message", async () => {
+      render(
+        <WinnerCelebration
+          {...defaultWinnerData}
+          showCelebration={true}
+          currentUserId="other-user"
+        />
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(SUSPENSE_PAUSE_MS + 3000);
+      });
+
+      await waitFor(() => {
+        // Text is split across elements, use getByTestId and check text content
+        const nonWinnerMessage = screen.getByTestId("non-winner-message");
+        expect(nonWinnerMessage.textContent).toMatch(/Congratulations to/);
+        expect(nonWinnerMessage.textContent).toMatch(/Lisa/);
       });
     });
   });

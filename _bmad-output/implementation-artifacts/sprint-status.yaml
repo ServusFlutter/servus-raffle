@@ -85,6 +85,6 @@ development_status:
   6-3-draw-winner-server-action: done
   6-4-wheel-of-fortune-animation: done
   6-5-winner-celebration-and-announcement: done
-  6-6-ticket-reset-and-post-win-messaging: backlog
+  6-6-ticket-reset-and-post-win-messaging: done
   6-7-sequential-prize-drawing-flow: backlog
   epic-6-retrospective: optional

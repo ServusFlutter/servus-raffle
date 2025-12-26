@@ -272,4 +272,45 @@ describe("getTicketMessage", () => {
   it("returns best odds message for large counts", () => {
     expect(getTicketMessage(100)).toBe("Your best odds yet!");
   });
+
+  // Story 6.6 AC #5: Winner with 0 tickets gets different message
+  describe("recentlyWon parameter (Story 6.6 AC #5)", () => {
+    it("returns winner message when recentlyWon=true and count=0", () => {
+      expect(getTicketMessage(0, true)).toBe(
+        "Start fresh! Every meetup is a new chance to win."
+      );
+    });
+
+    it("returns join message when recentlyWon=false and count=0", () => {
+      expect(getTicketMessage(0, false)).toBe("Join a raffle to get started!");
+    });
+
+    it("returns join message when recentlyWon is not provided and count=0", () => {
+      expect(getTicketMessage(0)).toBe("Join a raffle to get started!");
+    });
+
+    it("ignores recentlyWon when count > 0", () => {
+      // recentlyWon should have no effect when user has tickets
+      expect(getTicketMessage(1, true)).toBe("You're in! Good luck!");
+      expect(getTicketMessage(3, true)).toBe("Building momentum!");
+      expect(getTicketMessage(6, true)).toBe("Your best odds yet!");
+    });
+  });
+});
+
+describe("TicketCircle recentlyWon prop (Story 6.6)", () => {
+  it("accepts recentlyWon prop without error", () => {
+    render(<TicketCircle count={0} recentlyWon={true} />);
+    expect(screen.getByText("0")).toBeInTheDocument();
+  });
+
+  it("renders correctly when recentlyWon is false", () => {
+    render(<TicketCircle count={0} recentlyWon={false} />);
+    expect(screen.getByText("0")).toBeInTheDocument();
+  });
+
+  it("defaults recentlyWon to false when not provided", () => {
+    render(<TicketCircle count={0} />);
+    expect(screen.getByText("0")).toBeInTheDocument();
+  });
 });

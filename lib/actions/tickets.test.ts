@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { joinRaffle, getParticipation, getAccumulatedTickets } from "./tickets";
+import { joinRaffle, getParticipation, getAccumulatedTickets, getRecentWin } from "./tickets";
 import { createClient } from "@/lib/supabase/server";
 
 // Mock dependencies
@@ -724,6 +724,161 @@ describe("Ticket Server Actions", () => {
         expect(result).toEqual({
           data: null,
           error: "Failed to get participation",
+        });
+      });
+    });
+  });
+
+  /**
+   * Story 6.6: getRecentWin() tests
+   * Tests for detecting recent wins within 24 hours
+   */
+  describe("getRecentWin", () => {
+    describe("authentication", () => {
+      it("returns false when user is not authenticated (graceful failure)", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: null },
+          error: null,
+        });
+
+        const result = await getRecentWin();
+
+        // Should return false, not an error - fails gracefully
+        expect(result).toEqual({
+          data: false,
+          error: null,
+        });
+      });
+
+      it("returns false when auth check fails (graceful failure)", async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: null },
+          error: { message: "Auth error" },
+        });
+
+        const result = await getRecentWin();
+
+        expect(result).toEqual({
+          data: false,
+          error: null,
+        });
+      });
+    });
+
+    describe("recent win detection (Story 6.6 AC #5)", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: validUserId } },
+          error: null,
+        });
+      });
+
+      it("returns true when user won within last 24 hours", async () => {
+        // Mock winners query returning a recent win
+        mockSupabase.from = jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              gte: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  maybeSingle: jest.fn().mockResolvedValue({
+                    data: { id: "win-123" },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          }),
+        });
+
+        const result = await getRecentWin();
+
+        expect(result).toEqual({
+          data: true,
+          error: null,
+        });
+      });
+
+      it("returns false when user has no recent wins", async () => {
+        // Mock winners query returning no results
+        mockSupabase.from = jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              gte: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  maybeSingle: jest.fn().mockResolvedValue({
+                    data: null,
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          }),
+        });
+
+        const result = await getRecentWin();
+
+        expect(result).toEqual({
+          data: false,
+          error: null,
+        });
+      });
+
+      it("returns false when user has never won", async () => {
+        // Mock winners query with no matches
+        mockSupabase.from = jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              gte: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  maybeSingle: jest.fn().mockResolvedValue({
+                    data: null,
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          }),
+        });
+
+        const result = await getRecentWin();
+
+        expect(result).toEqual({
+          data: false,
+          error: null,
+        });
+      });
+    });
+
+    describe("database errors (graceful failure)", () => {
+      beforeEach(() => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+          data: { user: { id: validUserId } },
+          error: null,
+        });
+      });
+
+      it("returns false on database query failure (graceful failure)", async () => {
+        mockSupabase.from = jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              gte: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  maybeSingle: jest.fn().mockResolvedValue({
+                    data: null,
+                    error: { message: "Database error" },
+                  }),
+                }),
+              }),
+            }),
+          }),
+        });
+
+        const result = await getRecentWin();
+
+        // Should return false, not an error - graceful failure
+        expect(result).toEqual({
+          data: false,
+          error: null,
         });
       });
     });

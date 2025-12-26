@@ -5,15 +5,30 @@ export interface TicketCircleProps {
   count: number;
   size?: "default" | "large" | "projection";
   className?: string;
+  /**
+   * Story 6.6 AC #5: Indicates if the user recently won (within 24 hours)
+   * Used to differentiate "new user with 0 tickets" from "winner with 0 tickets"
+   */
+  recentlyWon?: boolean;
 }
 
 /**
  * Returns contextual messaging based on ticket count
+ *
+ * Story 6.6 AC #5: Winner Dashboard Ticket Display
+ * When recentlyWon is true and count is 0, shows winner-specific messaging
+ * instead of the default "Join a raffle" message for new users.
+ *
  * @param count - The number of tickets
+ * @param recentlyWon - Whether the user recently won (within 24 hours)
  * @returns Encouraging message string
  */
-export function getTicketMessage(count: number): string {
+export function getTicketMessage(count: number, recentlyWon: boolean = false): string {
   if (count === 0) {
+    // Story 6.6 AC #5: Winner with 0 tickets sees different message
+    if (recentlyWon) {
+      return "Start fresh! Every meetup is a new chance to win.";
+    }
     return "Join a raffle to get started!";
   }
   if (count === 1) {
@@ -41,12 +56,18 @@ export function getTicketMessage(count: number): string {
  * @param count - Number of tickets to display
  * @param size - Size variant: 'default' (200px), 'large' (300px), 'projection' (400px)
  * @param className - Additional CSS classes
+ * @param recentlyWon - Story 6.6: Whether user recently won (passed to parent for messaging)
  */
 export function TicketCircle({
   count,
   size = "default",
   className,
+  // Note: recentlyWon prop is accepted for interface consistency but messaging
+  // is handled externally via getTicketMessage(). This prop may be used in future for styling.
+  recentlyWon = false,
 }: TicketCircleProps) {
+  // Suppress unused variable warning - prop is part of the interface
+  void recentlyWon;
   // Track previous count to detect changes for animation
   const prevCountRef = useRef(count);
   const [isAnimating, setIsAnimating] = useState(false);

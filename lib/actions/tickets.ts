@@ -208,6 +208,19 @@ export async function getParticipation(
  * excluding tickets from before their last win (if any). This implements the
  * "tickets reset after winning" behavior.
  *
+ * **Story 6.6: Implicit Ticket Reset Mechanism**
+ * The ticket reset is NOT done by physically deleting or modifying participant records.
+ * Instead, it works implicitly through timestamp comparison:
+ * 1. When drawWinner() is called, it creates a `winners` table record with `won_at` timestamp
+ * 2. This function queries: `SELECT ticket_count FROM participants WHERE joined_at > last_win_timestamp`
+ * 3. Since the winner record has a `won_at` time, all participations BEFORE that time
+ *    are automatically excluded from the accumulated count
+ *
+ * This approach ensures:
+ * - AC #1 (FR9): Atomic ticket reset as part of draw transaction
+ * - AC #2: All previous tickets are effectively cleared (excluded from count)
+ * - No data loss - historical participation records are preserved for analytics
+ *
  * AC #1: Display accumulated ticket count
  * AC #2: Exclude won raffle tickets
  * AC #4: Post-win ticket reset in display
@@ -270,5 +283,60 @@ export async function getAccumulatedTickets(): Promise<ActionResult<number>> {
   } catch (e) {
     console.error("Unexpected error getting accumulated tickets:", e);
     return { data: null, error: "Failed to get ticket count" };
+  }
+}
+
+/**
+ * Check if the current user has won within the last 24 hours
+ *
+ * **Story 6.6: Recently Won Detection (AC #5)**
+ * Used to differentiate "new user with 0 tickets" from "recent winner with 0 tickets"
+ * in the TicketCircle component to show appropriate messaging.
+ *
+ * - New user with 0 tickets: "Join a raffle to get started!"
+ * - Recent winner with 0 tickets: "Start fresh! Every meetup is a new chance to win."
+ *
+ * @returns ActionResult with boolean indicating if user recently won
+ *
+ * @example
+ * const result = await getRecentWin();
+ * if (result.data) {
+ *   // Show winner-specific messaging
+ * }
+ */
+export async function getRecentWin(): Promise<ActionResult<boolean>> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      // Not authenticated - return false (not an error case)
+      return { data: false, error: null };
+    }
+
+    // Check for wins within the last 24 hours
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: recentWin, error } = await supabase
+      .from("winners")
+      .select("id")
+      .eq("user_id", user.id)
+      .gte("won_at", oneDayAgo)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Failed to check recent win:", error);
+      return { data: false, error: null }; // Fail gracefully
+    }
+
+    return { data: !!recentWin, error: null };
+  } catch (e) {
+    console.error("Unexpected error checking recent win:", e);
+    return { data: false, error: null }; // Fail gracefully
   }
 }

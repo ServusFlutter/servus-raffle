@@ -197,7 +197,7 @@ export function WinnerCelebration({
         </>
       )}
 
-      {/* Post-Celebration Phase - Non-winner message */}
+      {/* Post-Celebration Phase - Non-winner message (Story 6.5 AC #6, Story 6.6 AC #4) */}
       {phase === "post-celebration" && !isCurrentUserWinner && (
         <div
           data-testid="non-winner-message"
@@ -225,12 +225,12 @@ export function WinnerCelebration({
               isProjectionMode ? "text-3xl" : "text-xl"
             )}
           >
-            Not this time - your {currentUserTicketCount} {currentUserTicketCount === 1 ? "ticket carries" : "tickets carry"} forward!
+            Not this time - your {currentUserTicketCount} {currentUserTicketCount === 1 ? "ticket carries" : "tickets carry"} forward to the next raffle!
           </p>
         </div>
       )}
 
-      {/* Post-Celebration Phase - Winner sees different message */}
+      {/* Post-Celebration Phase - Winner sees different message (Story 6.6 AC #3) */}
       {phase === "post-celebration" && isCurrentUserWinner && (
         <div
           data-testid="winner-post-message"
@@ -247,15 +247,23 @@ export function WinnerCelebration({
               isProjectionMode ? "text-4xl" : "text-2xl"
             )}
           >
+            Congratulations!
+          </p>
+          <p
+            className={cn(
+              "text-white/90 mt-2",
+              isProjectionMode ? "text-2xl" : "text-lg"
+            )}
+          >
             You won {prizeName || "the prize"}!
           </p>
           <p
             className={cn(
-              "text-white/80 mt-2",
+              "text-white/70 mt-3",
               isProjectionMode ? "text-xl" : "text-base"
             )}
           >
-            Your tickets have been reset
+            Your tickets have been reset to 0. See you at the next meetup!
           </p>
         </div>
       )}

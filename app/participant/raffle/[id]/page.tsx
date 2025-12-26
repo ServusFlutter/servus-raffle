@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { ParticipantRaffleClient } from "./client";
-import { getAccumulatedTickets } from "@/lib/actions/tickets";
+import { getAccumulatedTickets, getRecentWin } from "@/lib/actions/tickets";
 import { getPrizesForParticipant } from "@/lib/actions/prizes";
 
 interface ParticipantRafflePageProps {
@@ -82,6 +82,10 @@ export default async function ParticipantRafflePage({
   // Fetch prizes for participant view (Story 5-3)
   const prizesResult = await getPrizesForParticipant(id);
 
+  // Story 6.6: Check if user recently won (within 24 hours)
+  const recentWinResult = await getRecentWin();
+  const recentlyWon = recentWinResult.data ?? false;
+
   // Fetch all participants for wheel animation (Story 6.4)
   // Get participant names joined with users table
   const { data: participantsData } = await supabase
@@ -118,6 +122,7 @@ export default async function ParticipantRafflePage({
       prizes={prizesResult.data || []}
       participants={wheelParticipants}
       currentUserId={user.id}
+      recentlyWon={recentlyWon}
     />
   );
 }

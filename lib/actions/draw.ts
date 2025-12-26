@@ -163,6 +163,19 @@ function generateWheelSeed(): number {
  * but only counts tickets earned AFTER their last win (if any).
  * This implements the "tickets reset after winning" behavior.
  *
+ * **Story 6.6: Implicit Ticket Reset Mechanism**
+ * The ticket reset is NOT done by physically deleting or modifying participant records.
+ * Instead, it works implicitly through timestamp comparison:
+ * 1. drawWinner() creates a `winners` table record with `won_at` timestamp
+ * 2. This function queries: tickets WHERE joined_at > last_win_timestamp
+ * 3. Since the winner record has a `won_at` time, all participations BEFORE that time
+ *    are automatically excluded from the accumulated count
+ *
+ * This approach ensures:
+ * - AC #1 (FR9): Atomic ticket reset as part of draw transaction
+ * - AC #2: All previous tickets are cleared (excluded from count)
+ * - No data loss - historical participation records are preserved
+ *
  * @param adminClient - Supabase client with service role
  * @param userId - UUID of the user
  * @returns Total accumulated ticket count

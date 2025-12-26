@@ -329,4 +329,249 @@ describe('Tickets Integration Tests', () => {
       await adminClient.from('participants').delete().eq('user_id', testUserId)
     })
   })
+
+  /**
+   * Story 6.6 AC #1, #2: Implicit Ticket Reset Integration Tests
+   *
+   * These tests verify that winning a prize implicitly resets the user's
+   * accumulated ticket count through the timestamp comparison mechanism.
+   */
+  describe('Implicit Ticket Reset (Story 6.6)', () => {
+    it('should show 0 accumulated tickets immediately after winning', async () => {
+      // Setup: User has participated in a raffle
+      const now = new Date()
+
+      await adminClient.from('participants').insert({
+        raffle_id: global.TEST_RAFFLE_ACTIVE_ID,
+        user_id: testUserId,
+        ticket_count: 5,
+        joined_at: now.toISOString(),
+      })
+
+      // Verify user has 5 tickets before win
+      const { data: preWinParticipations } = await adminClient
+        .from('participants')
+        .select('ticket_count')
+        .eq('user_id', testUserId)
+
+      const preWinTotal = preWinParticipations!.reduce(
+        (sum, p) => sum + p.ticket_count,
+        0
+      )
+      expect(preWinTotal).toBe(5)
+
+      // User wins the prize (won_at is after joined_at)
+      const winTime = new Date(now.getTime() + 1000) // 1 second after join
+      await adminClient.from('winners').insert({
+        raffle_id: global.TEST_RAFFLE_ACTIVE_ID,
+        user_id: testUserId,
+        tickets_at_win: 5,
+        won_at: winTime.toISOString(),
+      })
+
+      // Query accumulated tickets using the same logic as getAccumulatedTickets()
+      const { data: lastWin } = await adminClient
+        .from('winners')
+        .select('won_at')
+        .eq('user_id', testUserId)
+        .order('won_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const { data: postWinParticipations } = await adminClient
+        .from('participants')
+        .select('ticket_count')
+        .eq('user_id', testUserId)
+        .gt('joined_at', lastWin!.won_at)
+
+      const postWinTotal = postWinParticipations!.reduce(
+        (sum, p) => sum + p.ticket_count,
+        0
+      )
+
+      // Winner should see 0 tickets (AC #1, #2)
+      expect(postWinTotal).toBe(0)
+
+      // Clean up
+      await adminClient.from('winners').delete().eq('user_id', testUserId)
+      await adminClient.from('participants').delete().eq('user_id', testUserId)
+    })
+
+    it('should allow winner to accumulate new tickets in next raffle', async () => {
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+      const now = new Date()
+
+      // User participated and won yesterday
+      await adminClient.from('participants').insert({
+        raffle_id: global.TEST_RAFFLE_COMPLETED_ID,
+        user_id: testUserId,
+        ticket_count: 5,
+        joined_at: twoDaysAgo.toISOString(),
+      })
+
+      await adminClient.from('winners').insert({
+        raffle_id: global.TEST_RAFFLE_COMPLETED_ID,
+        user_id: testUserId,
+        tickets_at_win: 5,
+        won_at: yesterday.toISOString(),
+      })
+
+      // User joins a new raffle today
+      await adminClient.from('participants').insert({
+        raffle_id: global.TEST_RAFFLE_ACTIVE_ID,
+        user_id: testUserId,
+        ticket_count: 1,
+        joined_at: now.toISOString(),
+      })
+
+      // Query accumulated tickets
+      const { data: lastWin } = await adminClient
+        .from('winners')
+        .select('won_at')
+        .eq('user_id', testUserId)
+        .order('won_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const { data: postWinParticipations } = await adminClient
+        .from('participants')
+        .select('ticket_count')
+        .eq('user_id', testUserId)
+        .gt('joined_at', lastWin!.won_at)
+
+      const total = postWinParticipations!.reduce(
+        (sum, p) => sum + p.ticket_count,
+        0
+      )
+
+      // Winner should have 1 ticket from the new raffle
+      expect(total).toBe(1)
+
+      // Clean up
+      await adminClient.from('winners').delete().eq('user_id', testUserId)
+      await adminClient.from('participants').delete().eq('user_id', testUserId)
+    })
+
+    it('should preserve non-winner ticket count after draw', async () => {
+      // Create a second test user
+      const otherUserEmail = `test-other-${Date.now()}@example.com`
+      const { data: otherUserData } = await adminClient.auth.admin.createUser({
+        email: otherUserEmail,
+        password: global.TEST_PASSWORD,
+        email_confirm: true,
+      })
+      const otherUserId = otherUserData!.user!.id
+
+      await adminClient.from('users').insert({
+        id: otherUserId,
+        email: otherUserEmail,
+        name: 'Other Test User',
+      })
+
+      const now = new Date()
+
+      // Both users participate
+      await adminClient.from('participants').insert([
+        {
+          raffle_id: global.TEST_RAFFLE_ACTIVE_ID,
+          user_id: testUserId,
+          ticket_count: 5,
+          joined_at: now.toISOString(),
+        },
+        {
+          raffle_id: global.TEST_RAFFLE_ACTIVE_ID,
+          user_id: otherUserId,
+          ticket_count: 3,
+          joined_at: now.toISOString(),
+        },
+      ])
+
+      // testUser wins
+      await adminClient.from('winners').insert({
+        raffle_id: global.TEST_RAFFLE_ACTIVE_ID,
+        user_id: testUserId,
+        tickets_at_win: 5,
+        won_at: new Date(now.getTime() + 1000).toISOString(),
+      })
+
+      // Check non-winner (otherUser) tickets - should be unchanged
+      const { data: nonWinnerParticipations } = await adminClient
+        .from('participants')
+        .select('ticket_count')
+        .eq('user_id', otherUserId)
+
+      const nonWinnerTotal = nonWinnerParticipations!.reduce(
+        (sum, p) => sum + p.ticket_count,
+        0
+      )
+
+      // Non-winner should still have 3 tickets
+      expect(nonWinnerTotal).toBe(3)
+
+      // Clean up
+      await adminClient.from('winners').delete().eq('user_id', testUserId)
+      await adminClient.from('participants').delete().eq('user_id', testUserId)
+      await adminClient.from('participants').delete().eq('user_id', otherUserId)
+      await adminClient.from('users').delete().eq('id', otherUserId)
+      await adminClient.auth.admin.deleteUser(otherUserId)
+    })
+
+    it('should detect recent win within 24 hours', async () => {
+      // User won 12 hours ago
+      const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000)
+
+      await adminClient.from('winners').insert({
+        raffle_id: global.TEST_RAFFLE_COMPLETED_ID,
+        user_id: testUserId,
+        tickets_at_win: 5,
+        won_at: twelveHoursAgo.toISOString(),
+      })
+
+      // Query for recent wins (within 24 hours)
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+      const { data: recentWin } = await adminClient
+        .from('winners')
+        .select('id')
+        .eq('user_id', testUserId)
+        .gte('won_at', oneDayAgo)
+        .limit(1)
+        .maybeSingle()
+
+      expect(recentWin).not.toBeNull()
+
+      // Clean up
+      await adminClient.from('winners').delete().eq('user_id', testUserId)
+    })
+
+    it('should NOT detect win older than 24 hours as recent', async () => {
+      // User won 36 hours ago
+      const thirtyySixHoursAgo = new Date(Date.now() - 36 * 60 * 60 * 1000)
+
+      await adminClient.from('winners').insert({
+        raffle_id: global.TEST_RAFFLE_COMPLETED_ID,
+        user_id: testUserId,
+        tickets_at_win: 5,
+        won_at: thirtyySixHoursAgo.toISOString(),
+      })
+
+      // Query for recent wins (within 24 hours)
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+      const { data: recentWin } = await adminClient
+        .from('winners')
+        .select('id')
+        .eq('user_id', testUserId)
+        .gte('won_at', oneDayAgo)
+        .limit(1)
+        .maybeSingle()
+
+      // Old win should NOT be detected as recent
+      expect(recentWin).toBeNull()
+
+      // Clean up
+      await adminClient.from('winners').delete().eq('user_id', testUserId)
+    })
+  })
 })

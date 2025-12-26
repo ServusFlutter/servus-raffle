@@ -61,6 +61,8 @@ interface ParticipantRaffleClientProps {
   participants?: WheelParticipant[];
   /** Current user ID for winner detection (Story 6.5) */
   currentUserId: string;
+  /** Story 6.6: Whether user recently won (within 24 hours) for messaging */
+  recentlyWon?: boolean;
 }
 
 /**
@@ -80,6 +82,7 @@ export function ParticipantRaffleClient({
   prizes,
   participants = [],
   currentUserId,
+  recentlyWon = false,
 }: ParticipantRaffleClientProps) {
   // Calculate if this is a multi-event user (accumulated tickets differ from per-raffle)
   const isMultiEventUser = ticketCount > perRaffleTicketCount;
@@ -286,10 +289,10 @@ export function ParticipantRaffleClient({
         <CardContent className="space-y-6">
           {/* Ticket Count Display - Hero TicketCircle Component (AC #1, #6) */}
           <div className="flex flex-col items-center justify-center py-4">
-            <TicketCircle count={ticketCount} size="default" />
-            {/* Contextual Messaging (Story 3.3 AC #1, #3) - reflects accumulated count */}
+            <TicketCircle count={ticketCount} size="default" recentlyWon={recentlyWon} />
+            {/* Contextual Messaging (Story 3.3 AC #1, #3, Story 6.6 AC #5) - reflects accumulated count and recent win status */}
             <p className="text-sm text-muted-foreground mt-4 font-medium">
-              {getTicketMessage(ticketCount)}
+              {getTicketMessage(ticketCount, recentlyWon)}
             </p>
             {/* Show accumulated ticket explanation for multi-event users (Story 3.3 AC #3) */}
             {isMultiEventUser && (

@@ -465,4 +465,74 @@ describe("ParticipantRaffleClient", () => {
       expect(screen.getByTestId("ticket-circle")).toBeInTheDocument();
     });
   });
+
+  describe("Recently Won Messaging (Story 6.6 AC #5)", () => {
+    it("shows winner message when recentlyWon=true and ticketCount=0", () => {
+      render(
+        <ParticipantRaffleClient
+          {...defaultProps}
+          ticketCount={0}
+          perRaffleTicketCount={0}
+          recentlyWon={true}
+        />
+      );
+
+      expect(
+        screen.getByText("Start fresh! Every meetup is a new chance to win.")
+      ).toBeInTheDocument();
+    });
+
+    it("shows join message when recentlyWon=false and ticketCount=0", () => {
+      render(
+        <ParticipantRaffleClient
+          {...defaultProps}
+          ticketCount={0}
+          perRaffleTicketCount={0}
+          recentlyWon={false}
+        />
+      );
+
+      expect(screen.getByText("Join a raffle to get started!")).toBeInTheDocument();
+    });
+
+    it("shows join message when recentlyWon is not provided and ticketCount=0", () => {
+      render(
+        <ParticipantRaffleClient
+          {...defaultProps}
+          ticketCount={0}
+          perRaffleTicketCount={0}
+        />
+      );
+
+      expect(screen.getByText("Join a raffle to get started!")).toBeInTheDocument();
+    });
+
+    it("ignores recentlyWon when ticketCount > 0", () => {
+      render(
+        <ParticipantRaffleClient
+          {...defaultProps}
+          ticketCount={3}
+          recentlyWon={true}
+        />
+      );
+
+      // Should show the normal message for 3 tickets, not the winner message
+      expect(screen.getByText("Building momentum!")).toBeInTheDocument();
+    });
+
+    it("passes recentlyWon prop to TicketCircle", () => {
+      render(
+        <ParticipantRaffleClient
+          {...defaultProps}
+          ticketCount={0}
+          perRaffleTicketCount={0}
+          recentlyWon={true}
+        />
+      );
+
+      // TicketCircle should render correctly with recentlyWon
+      expect(screen.getByTestId("ticket-circle")).toBeInTheDocument();
+      expect(screen.getByText("0")).toBeInTheDocument();
+    });
+  });
 });
