@@ -1,5 +1,14 @@
-import { withSupawright } from 'supawright'
+import {
+  SUPABASE_DB_HOST,
+  SUPABASE_DB_NAME,
+  SUPABASE_DB_PASSWORD,
+  SUPABASE_DB_PORT,
+  SUPABASE_DB_USER,
+  SUPABASE_SERVICE_ROLE_KEY,
+  SUPABASE_URL,
+} from '@/tests/env'
 import type { Database } from '@/types/database'
+import { withSupawright } from 'supawright'
 
 /**
  * E2E Test Fixtures
@@ -25,16 +34,16 @@ import type { Database } from '@/types/database'
 
 export const test = withSupawright<Database, 'public'>(['public'], {
   supabase: {
-    supabaseUrl: process.env.SUPABASE_URL!,
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    supabaseUrl: SUPABASE_URL,
+    serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
   },
   // Direct Postgres connection for schema introspection
   database: {
-    host: process.env.SUPABASE_DB_HOST!,
-    port: parseInt(process.env.SUPABASE_DB_PORT!, 10),
-    user: process.env.SUPABASE_DB_USER!,
-    password: process.env.SUPABASE_DB_PASSWORD!,
-    database: process.env.SUPABASE_DB_NAME!,
+    host: SUPABASE_DB_HOST,
+    port: SUPABASE_DB_PORT,
+    user: SUPABASE_DB_USER,
+    password: SUPABASE_DB_PASSWORD,
+    database: SUPABASE_DB_NAME,
   },
 })
 

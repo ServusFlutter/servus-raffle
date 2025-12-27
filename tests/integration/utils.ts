@@ -1,22 +1,13 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL } from '@/tests/env'
 import type { Database } from '@/types/database'
-
-// Test Supabase runs on port 54421 (offset +100 from dev)
-const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54421'
+import { type SupabaseClient, createClient } from '@supabase/supabase-js'
 
 /**
  * Service role client - bypasses RLS for setup/teardown
  * Use this for creating test data and cleanup
  */
 export function createServiceRoleClient(): SupabaseClient<Database> {
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!serviceKey) {
-    throw new Error(
-      'SUPABASE_SERVICE_ROLE_KEY not set. Run `bunx supabase --workdir supabase-test status` to get it.'
-    )
-  }
-
-  return createClient<Database>(SUPABASE_URL, serviceKey, {
+  return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   })
 }
@@ -26,14 +17,7 @@ export function createServiceRoleClient(): SupabaseClient<Database> {
  * Use this for testing actual user permissions
  */
 export function createAnonClient(): SupabaseClient<Database> {
-  const anonKey = process.env.SUPABASE_ANON_KEY
-  if (!anonKey) {
-    throw new Error(
-      'SUPABASE_ANON_KEY not set. Run `bunx supabase --workdir supabase-test status` to get it.'
-    )
-  }
-
-  return createClient<Database>(SUPABASE_URL, anonKey, {
+  return createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: false },
   })
 }
@@ -77,8 +61,5 @@ export async function cleanupTestData(tables: TableName[] = []) {
 export async function resetTicketCounts(raffleId: string, ticketCount = 5) {
   const client = createServiceRoleClient()
 
-  await client
-    .from('participants')
-    .update({ ticket_count: ticketCount })
-    .eq('raffle_id', raffleId)
+  await client.from('participants').update({ ticket_count: ticketCount }).eq('raffle_id', raffleId)
 }

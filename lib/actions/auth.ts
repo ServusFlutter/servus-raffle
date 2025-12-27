@@ -1,14 +1,12 @@
 'use server'
 
-import { redirect } from 'next/navigation'
-import { revalidatePath } from 'next/cache'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { SignInSchema, SignUpSchema } from '@/lib/schemas/auth'
-import { type ActionResult, success, failure } from '@/types/actions'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { type ActionResult, failure, success } from '@/types/actions'
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 
-export async function signIn(
-  formData: FormData
-): Promise<ActionResult<{ userId: string }>> {
+export async function signIn(formData: FormData): Promise<ActionResult<{ userId: string }>> {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
@@ -33,9 +31,7 @@ export async function signIn(
   return success({ userId: data.user.id })
 }
 
-export async function signUp(
-  formData: FormData
-): Promise<ActionResult<{ userId: string }>> {
+export async function signUp(formData: FormData): Promise<ActionResult<{ userId: string }>> {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const name = formData.get('name') as string | null

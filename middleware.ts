@@ -1,14 +1,12 @@
-import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import { type NextRequest, NextResponse } from 'next/server'
 
 export async function middleware(request: NextRequest) {
   const { supabaseResponse, user } = await updateSession(request)
 
   // Protected routes that require authentication
   const protectedPaths = ['/admin', '/raffle']
-  const isProtectedPath = protectedPaths.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
-  )
+  const isProtectedPath = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path))
 
   // Redirect unauthenticated users to login
   if (isProtectedPath && !user) {
@@ -19,9 +17,7 @@ export async function middleware(request: NextRequest) {
 
   // Redirect authenticated users away from auth pages
   const authPaths = ['/login', '/signup']
-  const isAuthPath = authPaths.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
-  )
+  const isAuthPath = authPaths.some((path) => request.nextUrl.pathname.startsWith(path))
 
   if (isAuthPath && user) {
     return NextResponse.redirect(new URL('/', request.url))

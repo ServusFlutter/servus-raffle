@@ -1,13 +1,20 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { signIn } from '@/lib/actions/auth'
 import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { signIn } from '@/lib/actions/auth'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 
 interface LoginFormProps {
   redirectTo?: string
@@ -38,16 +45,12 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
     <Card className="w-full max-w-md">
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold">Sign in</CardTitle>
-        <CardDescription>
-          Enter your email and password to access your account
-        </CardDescription>
+        <CardDescription>Enter your email and password to access your account</CardDescription>
       </CardHeader>
       <form action={handleSubmit}>
         <CardContent className="space-y-4">
           {error && (
-            <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
-              {error}
-            </div>
+            <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">{error}</div>
           )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>

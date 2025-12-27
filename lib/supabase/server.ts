@@ -1,35 +1,30 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { SUPABASE_ANON_KEY, SUPABASE_URL, getServiceRoleKey } from '@/lib/env'
+import type { Database } from '@/types/database'
+import { type CookieOptions, createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
-import type { Database } from '@/types/database'
 
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies()
 
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(
-          cookiesToSet: { name: string; value: string; options?: CookieOptions }[]
-        ) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
+  return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll()
       },
-    }
-  )
+      setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
+        try {
+          for (const { name, value, options } of cookiesToSet) {
+            cookieStore.set(name, value, options)
+          }
+        } catch {
+          // The `setAll` method was called from a Server Component.
+          // This can be ignored if you have middleware refreshing
+          // user sessions.
+        }
+      },
+    },
+  })
 }
 
 /**
@@ -37,14 +32,10 @@ export async function createServerSupabaseClient() {
  * Use ONLY in Server Actions, never expose to client
  */
 export function createServiceRoleClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    }
-  )
+  return createClient<Database>(SUPABASE_URL, getServiceRoleKey(), {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  })
 }

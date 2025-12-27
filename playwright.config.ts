@@ -1,11 +1,14 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig, devices } from '@playwright/test'
 import dotenv from 'dotenv'
-import path from 'path'
-import { fileURLToPath } from 'url'
 
 // Load test environment variables
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 dotenv.config({ path: path.resolve(__dirname, '.env.test.local') })
+
+// Import validated env after dotenv loads
+import { SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL } from './tests/env'
 
 /**
  * Playwright E2E Test Configuration
@@ -43,9 +46,9 @@ export default defineConfig({
     timeout: 120 * 1000,
     env: {
       // Pass test Supabase config to Next.js dev server
-      NEXT_PUBLIC_SUPABASE_URL: process.env.SUPABASE_URL!,
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      NEXT_PUBLIC_SUPABASE_URL: SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: SUPABASE_ANON_KEY,
+      SUPABASE_SERVICE_ROLE_KEY: SUPABASE_SERVICE_ROLE_KEY,
     },
   },
 })

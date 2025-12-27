@@ -1,14 +1,14 @@
 import { execSync } from 'node:child_process'
 
 export async function setup() {
-  console.log('🚀 Starting integration test setup...')
+  console.info('🚀 Starting integration test setup...')
 
   // Check if Test Supabase is running
   try {
     execSync('bunx supabase --workdir supabase-test status', {
       encoding: 'utf-8',
     })
-    console.log('✅ Test Supabase is running')
+    console.info('✅ Test Supabase is running')
 
     // Set standard local Supabase demo keys if not already set
     if (!process.env.SUPABASE_ANON_KEY) {
@@ -27,19 +27,19 @@ export async function setup() {
   }
 
   // Reset database to clean state with seed data
-  console.log('🔄 Resetting test database...')
+  console.info('🔄 Resetting test database...')
   try {
     execSync('bunx supabase --workdir supabase-test db reset --yes', {
       encoding: 'utf-8',
       stdio: 'inherit',
     })
-    console.log('✅ Test database reset complete')
+    console.info('✅ Test database reset complete')
   } catch (error) {
     console.error('❌ Failed to reset test database:', error)
     process.exit(1)
   }
 
-  console.log('✅ Integration test setup complete')
+  console.info('✅ Integration test setup complete')
 }
 
 export default setup
