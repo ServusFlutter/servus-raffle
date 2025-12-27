@@ -93,6 +93,44 @@ With green tests, refactor for clarity:
 - Remove duplication
 - **Run tests after each change**
 
+## Test Type Decision Guide
+
+Before writing tests, determine which type to use:
+
+| Scenario | Test Type | Location | Why |
+|----------|-----------|----------|-----|
+| Zod schema validation | Unit | `*.test.ts` | Fast, isolated logic |
+| Server Action logic | Unit | `*.test.ts` | Mock DB, test business logic |
+| Server Action + real DB | Integration | `tests/integration/` | Verify DB operations |
+| RLS policies | Integration | `tests/integration/` | Test real permissions |
+| Database constraints | Integration | `tests/integration/` | Test real constraints |
+| UI component renders | Unit | `*.test.tsx` | Fast feedback |
+| User clicks through flow | E2E | `tests/e2e/` | Real browser, full stack |
+| Realtime sync | E2E | `tests/e2e/` | Requires browser + Supabase |
+| Cross-page navigation | E2E | `tests/e2e/` | Full user journey |
+
+### TDD Applies to ALL Test Types
+
+The TDD cycle (Red → Green → Refactor) applies whether you're writing:
+
+1. **Unit test** → Write failing test → Implement function → Test passes
+2. **Integration test** → Write failing test → Implement with DB → Test passes
+3. **E2E test** → Write failing test → Implement UI + backend → Test passes
+
+### Test Layer Separation
+
+```
+┌─────────────────────────────────────┐
+│  E2E (Playwright + Supawright)      │  Browser-based, slow, thorough
+├─────────────────────────────────────┤
+│  Integration (Vitest + real DB)     │  Real Supabase, fast, focused
+├─────────────────────────────────────┤
+│  Unit (Vitest + mocks)              │  Fastest, isolated, comprehensive
+└─────────────────────────────────────┘
+```
+
+---
+
 ## What to Test
 
 ### REQUIRED - Full Coverage
@@ -176,18 +214,21 @@ describe('calculateTotal', () => {
 ## Commands
 
 ```bash
-# Run all tests
-bun run test
+# Unit tests
+bun run test                    # Run all unit tests
+bun run test path/to/file.test.ts  # Run specific file
+bun run test --grep "drawWinner"   # Match pattern
+bun run test:watch              # Watch mode
+bun run test:coverage           # With coverage report
 
-# Run specific test file
-bun run test path/to/file.test.ts
+# Integration tests (requires test Supabase running)
+bun run supabase:test           # Start test Supabase
+bun run supabase:test:reset     # Reset with seed data
+bun run test:integration        # Run integration tests
 
-# Run tests matching pattern
-bun run test --grep "drawWinner"
-
-# Watch mode (re-run on changes)
-bun run test:watch
-
-# With coverage report
-bun run test:coverage
+# E2E tests (requires test Supabase running)
+bun run test:e2e                # Run all E2E tests (headless)
+bun run test:e2e:ui             # Interactive UI mode
+bun run test:e2e:headed         # With visible browser
+bun run test:e2e:debug          # Debug mode
 ```

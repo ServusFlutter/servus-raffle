@@ -26,6 +26,9 @@ Thumbs.db
 
 # Testing
 coverage/
+playwright-report/
+playwright/.cache/
+test-results/
 
 # Supabase
 .supabase/
