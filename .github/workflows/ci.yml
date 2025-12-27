@@ -133,26 +133,10 @@ jobs:
         with:
           version: latest
 
-      - name: Cache Supabase Docker images
-        uses: actions/cache@v4
-        id: supabase-cache
-        with:
-          path: /tmp/supabase-docker-images.tar
-          key: supabase-docker-${{ runner.os }}-${{ hashFiles('supabase-test/config.toml') }}
-
-      - name: Load cached Docker images
-        if: steps.supabase-cache.outputs.cache-hit == 'true'
-        run: docker load -i /tmp/supabase-docker-images.tar
-
       - name: Start test Supabase
         run: |
           bunx supabase --workdir supabase-test start
           bunx supabase --workdir supabase-test db reset
-
-      - name: Save Docker images to cache
-        if: steps.supabase-cache.outputs.cache-hit != 'true'
-        run: |
-          docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(supabase|postgres|kong|gotrue|postgrest|realtime|storage|imgproxy|pgmeta|studio|logflare|vector)" | xargs -r docker save -o /tmp/supabase-docker-images.tar
 
       # ─────────────────────────────────────────────────────────────
       # Run Tests
@@ -224,26 +208,10 @@ jobs:
         with:
           version: latest
 
-      - name: Cache Supabase Docker images
-        uses: actions/cache@v4
-        id: supabase-cache
-        with:
-          path: /tmp/supabase-docker-images.tar
-          key: supabase-docker-${{ runner.os }}-${{ hashFiles('supabase-test/config.toml') }}
-
-      - name: Load cached Docker images
-        if: steps.supabase-cache.outputs.cache-hit == 'true'
-        run: docker load -i /tmp/supabase-docker-images.tar
-
       - name: Start test Supabase
         run: |
           bunx supabase --workdir supabase-test start
           bunx supabase --workdir supabase-test db reset
-
-      - name: Save Docker images to cache
-        if: steps.supabase-cache.outputs.cache-hit != 'true'
-        run: |
-          docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(supabase|postgres|kong|gotrue|postgrest|realtime|storage|imgproxy|pgmeta|studio|logflare|vector)" | xargs -r docker save -o /tmp/supabase-docker-images.tar
 
       # ─────────────────────────────────────────────────────────────
       # Test Environment
