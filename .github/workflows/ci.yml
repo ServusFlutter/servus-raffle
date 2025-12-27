@@ -1,4 +1,4 @@
-name: E2E Tests
+name: CI
 
 on:
   push:
@@ -18,16 +18,93 @@ env:
   SUPABASE_DB_NAME: postgres
 
 jobs:
-  e2e:
-    timeout-minutes: 30
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Lint - Biome check (~30s)
+  # ═══════════════════════════════════════════════════════════════════════════
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
 
-      # ─────────────────────────────────────────────────────────────
-      # Bun Setup with Dependency Caching
-      # ─────────────────────────────────────────────────────────────
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        id: bun-cache
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.bun-cache.outputs.cache-hit != 'true'
+        run: bun install
+
+      - name: Run Biome lint
+        run: bun run lint
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Unit Tests - Vitest with mocks (~30s)
+  # ═══════════════════════════════════════════════════════════════════════════
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        id: bun-cache
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.bun-cache.outputs.cache-hit != 'true'
+        run: bun install
+
+      - name: Run unit tests
+        run: bun run test:coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Integration Tests - Vitest + Supabase (~2 min)
+  # ═══════════════════════════════════════════════════════════════════════════
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -49,27 +126,7 @@ jobs:
         run: bun install
 
       # ─────────────────────────────────────────────────────────────
-      # Playwright Browser Caching
-      # Cache key uses bun.lock hash which contains Playwright version
-      # ─────────────────────────────────────────────────────────────
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: bunx playwright install chromium --with-deps
-
-      - name: Install Playwright system deps (cached browsers)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: bunx playwright install-deps chromium
-
-      # ─────────────────────────────────────────────────────────────
-      # Supabase Docker Image Caching
-      # Cache key uses config.toml hash to invalidate when config changes
+      # Supabase Setup
       # ─────────────────────────────────────────────────────────────
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -98,7 +155,98 @@ jobs:
           docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(supabase|postgres|kong|gotrue|postgrest|realtime|storage|imgproxy|pgmeta|studio|logflare|vector)" | xargs -r docker save -o /tmp/supabase-docker-images.tar
 
       # ─────────────────────────────────────────────────────────────
-      # Test Environment Setup
+      # Run Tests
+      # ─────────────────────────────────────────────────────────────
+      - name: Run integration tests
+        run: bun run test:integration
+
+      - name: Stop Supabase
+        if: always()
+        run: bunx supabase --workdir supabase-test stop
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # E2E Tests - Playwright + Supabase (~4 min)
+  # ═══════════════════════════════════════════════════════════════════════════
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ─────────────────────────────────────────────────────────────
+      # Bun Setup
+      # ─────────────────────────────────────────────────────────────
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        id: bun-cache
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.bun-cache.outputs.cache-hit != 'true'
+        run: bun install
+
+      # ─────────────────────────────────────────────────────────────
+      # Playwright Setup
+      # ─────────────────────────────────────────────────────────────
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: bunx playwright install chromium --with-deps
+
+      - name: Install Playwright system deps (cached browsers)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
+
+      # ─────────────────────────────────────────────────────────────
+      # Supabase Setup
+      # ─────────────────────────────────────────────────────────────
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Cache Supabase Docker images
+        uses: actions/cache@v4
+        id: supabase-cache
+        with:
+          path: /tmp/supabase-docker-images.tar
+          key: supabase-docker-${{ runner.os }}-${{ hashFiles('supabase-test/config.toml') }}
+
+      - name: Load cached Docker images
+        if: steps.supabase-cache.outputs.cache-hit == 'true'
+        run: docker load -i /tmp/supabase-docker-images.tar
+
+      - name: Start test Supabase
+        run: |
+          bunx supabase --workdir supabase-test start
+          bunx supabase --workdir supabase-test db reset
+
+      - name: Save Docker images to cache
+        if: steps.supabase-cache.outputs.cache-hit != 'true'
+        run: |
+          docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(supabase|postgres|kong|gotrue|postgrest|realtime|storage|imgproxy|pgmeta|studio|logflare|vector)" | xargs -r docker save -o /tmp/supabase-docker-images.tar
+
+      # ─────────────────────────────────────────────────────────────
+      # Test Environment
       # ─────────────────────────────────────────────────────────────
       - name: Create test env file
         run: |
@@ -114,7 +262,7 @@ jobs:
           EOF
 
       # ─────────────────────────────────────────────────────────────
-      # Next.js Build with Caching
+      # Next.js Build
       # ─────────────────────────────────────────────────────────────
       - name: Cache Next.js build
         uses: actions/cache@v4
@@ -139,7 +287,7 @@ jobs:
         env:
           CI: true
 
-      - name: Upload test artifacts
+      - name: Upload Playwright report
         uses: actions/upload-artifact@v4
         if: failure()
         with:
